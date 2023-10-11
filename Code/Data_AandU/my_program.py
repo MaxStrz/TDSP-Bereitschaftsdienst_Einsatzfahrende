@@ -13,8 +13,13 @@ df_2 = data_prep.df_new_columns(df)
 
 df_2 = df_2.drop(['n_duty', 'n_sby', 'sby_need', 'dafted', 'predict_day'], axis=1)
 
+reg, reg_score, df_demand_predict = data_prep.notrufe_demand_reg(df_2)
+
+df_demand_predict, ax = data_prep.notruf_reg(df_demand_predict)
+
 # speichere df_2 als csv
-df_2.to_csv('df_new_columns.csv')
+df_demand_predict.to_csv('df_new_columns.csv')
+df_demand_predict.to_pickle('df_new_columns.pkl')
 
 # df_2 = data_prep.df_new_columns(df) # Neue Spalten erstellen
 # df_2 = df_2.drop(['n_duty', 'n_sby', 'sby_need', 'dafted', 'predict_day'], axis=1)

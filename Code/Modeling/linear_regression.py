@@ -1,16 +1,24 @@
+import sys
 import pandas as pd
-import os
+import numpy as np
 
-# import df_new_columns.csv
-# One folder up, then into the folder
-def csv_filepath2df():
-    """Verwendet absoluten Pfad des Skripts und relativen Pfad zur CSV-Datei um einen DataFrame zu erstellen"""
-    current_directory = os.path.dirname(__file__) # <-- absolute dir the script is in
-    filepath = os.path.join(current_directory, "../Data_AandU/df_new_columns.csv") # <-- absolute dir the script is in + path to csv file
-    df = pd.read_csv(filepath, index_col=0)
+sys.path.insert(0, '../Data_AandU')
+import dataPrep as data_prep
 
-    return df
+#create class for regression
+class TrendRegression:
+    def __init__(self):
+        """Initialize class with a regression model"""
+        self.df = pd.read_pickle('df_new_columns.pkl')
+        self.df_predict, self.ax, self.reg = data_prep.notruf_reg(self.df)
+        self.startdate = np.datetime64('2016-04-01')
+        self.df_final_features = self.df_predict.drop(['calls','n_sick', 'demand', 'demand_pred', 'calls_pred'], axis=1)
 
-df = csv_filepath2df()
+reg_class = TrendRegression()
+reg = reg_class.reg
 
-print(df.head())
+arr = np.array([[5]])
+
+# Mit Scikit-Learn regression-Modell 'reg', sagen Datum vorher
+day_pred = reg.predict(arr)
+print(day_pred)

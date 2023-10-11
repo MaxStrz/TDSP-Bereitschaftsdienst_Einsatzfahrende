@@ -367,7 +367,8 @@ def seas_decomp(df):
 
 def notruf_reg(df):
 
-    x = np.array((df['date']-df['date'].min()).dt.days + 1)
+    startdate = np.datetime64('2016-04-01')
+    x = np.array((df['date']-startdate).dt.days + 1)
     x = x.reshape(-1, 1)
     y = np.array(df['calls']).reshape(-1, 1)
 
@@ -396,7 +397,7 @@ def notruf_reg(df):
     ax.scatter(df['date'].to_numpy(), y, s=3)
     ax.plot(df['date'].to_numpy(), df['calls_pred'].to_numpy(), color='red')
 
-    return df, ax
+    return df, ax, reg
 
 def notrend_scatter(df):
     fig, ax = plt.subplots(figsize=(10, 5))
