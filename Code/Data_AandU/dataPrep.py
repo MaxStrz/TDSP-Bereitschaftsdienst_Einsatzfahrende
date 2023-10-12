@@ -23,8 +23,8 @@ def my_df():
     df_build_notes = []
     def csv_filepath2df():
         """Verwendet absoluten Pfad des Skripts und relativen Pfad zur CSV-Datei um einen DataFrame zu erstellen"""
-        current_directory = os.path.dirname(__file__) # <-- absolute dir the script is in
-        filepath = os.path.join(current_directory, "../../Sample_Data/Raw/sickness_table.csv") # <-- absolute dir the script is in + path to csv file
+        current_directory = os.path.dirname(__file__) # absolute dir the script is in
+        filepath = os.path.join(current_directory, "../../Sample_Data/Raw/sickness_table.csv") # absolute dir the script is in + path to csv file
         df = pd.read_csv(filepath, index_col=0)
 
         # Bestätigung, dass die CSV-Datei erfolgreich in einen DataFrame umgewandelt wurde
@@ -149,9 +149,14 @@ def df_new_columns(df):
     df_2['season'] = (df_2['month']-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
     df_2['predict_day'] = df_2['date'] - DateOffset(months=1, day=15) # Datum des 15. des vorherigen Monats
 
-    # Nachfrage = aktivierter Bdienst + \regulären Dienst - krank gemeldet (wenn 'sby_need' > 0)
-    df_2['demand'] = np.where(df_2['sby_need'] > 0, df_2['sby_need'] + df_2['n_duty'] - df_2['n_sick'], np.nan) 
+    # if df_2['sby_need'] exists
+    if 'sby_need' in df_2.columns:
+        # Nachfrage = aktivierter Bdienst + \regulären Dienst - krank gemeldet (wenn 'sby_need' > 0)
+        df_2['demand'] = np.where(df_2['sby_need'] > 0, df_2['sby_need'] + df_2['n_duty'] - df_2['n_sick'], np.nan) 
     
+    else:
+        pass
+
     return df_2
 
 def sby_needed_vs_calls(df):
@@ -405,8 +410,6 @@ def notrend_scatter(df):
 
     #plt.show()
 
-
-
 def my_model_options(df):
 
     if 'date' in df:
@@ -459,7 +462,7 @@ def my_model_options(df):
     results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
     results_df = pd.DataFrame(results, index=[0])
 
-    return full_pred_df, feature_gini_importance, results_df
+    return full_pred_df, feature_gini_importance, results_df, adabr
 
 def plot_train_test(full_pred_df, df):
     fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
@@ -480,3 +483,15 @@ def plot_train_test(full_pred_df, df):
     ax_1.set_title('Calls_diff und Predictions')
     
     plt.show()
+
+
+def scat_act_pred(df):
+    # Erstelle ein Streuungsdiagramm mit 'date' auf der x-Achse und 'calls' auf der y-Achse
+    fig, ax = plt.subplots()
+    # Aus der 'type'-Spalte sind 'Actual'-Daten blau und 'Prediction'-Daten rot
+    ax.scatter(df['date'], df['calls'], s=3, color=df['type'].map({'actual':'blue', 'prediction':'red'}))
+    # Achsenbeschriftung
+    ax.set_xlabel('Datum')
+    ax.set_ylabel('Anzahl der Notrufe')
+    # Zeige das Diagramm
+    plt.show()    
