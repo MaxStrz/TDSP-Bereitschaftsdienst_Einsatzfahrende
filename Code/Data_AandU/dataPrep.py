@@ -344,9 +344,9 @@ def get_train_test_fm(feature_matrix):
         
     return train_test
 
-def notrufe_demand_reg(df_2):
+def notrufe_demand_reg(df_dem_pred):
 
-    df_dem_pred = df_2.copy()
+    #df_dem_pred = df_2.copy()
 
     # Keep df-Spalten 'calls' and 'demand' where 'demand' is not NaN.
     df_reg = df_dem_pred[['calls', 'demand']].query('demand > 0')
@@ -412,14 +412,8 @@ def notrend_scatter(df):
 
 def my_model_options(df):
 
-    if 'date' in df:
-        df = df.drop(['date'], axis=1)
-
-    else:
-        pass
-
     # Merkmalsvariablen von Zielvariable trennen
-    X = df.drop(['calls_diff'], axis=1).copy()
+    X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
     y = df['calls_diff']
 
     # Train/Test Split
@@ -447,9 +441,9 @@ def my_model_options(df):
     full_pred_rf = rf.predict(X)
     full_pred_adabr = adabr.predict(X)
 
-    # DataFrame mit den Vorhersagen und den Merkmalsvariablen
-    dict = {'full_pred_rf':full_pred_rf, 'full_pred_adabr':full_pred_adabr}
-    full_pred_df = pd.DataFrame(dict, index=X.index)
+    # Vorhersagen der Modelle in den DataFrame einfügen
+    df['randforest_pred'] = full_pred_rf
+    df['adaboost_pred'] = full_pred_adabr
 
     # Berechne mean squared error für die Vorhersagen
     mse_rf = mean_squared_error(y_test, predictions_rf)
@@ -462,7 +456,7 @@ def my_model_options(df):
     results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
     results_df = pd.DataFrame(results, index=[0])
 
-    return full_pred_df, feature_gini_importance, results_df, adabr
+    return df, feature_gini_importance, results_df, adabr
 
 def plot_train_test(full_pred_df, df):
     fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
@@ -494,4 +488,4 @@ def scat_act_pred(df):
     ax.set_xlabel('Datum')
     ax.set_ylabel('Anzahl der Notrufe')
     # Zeige das Diagramm
-    plt.show()    
+    plt.show()
