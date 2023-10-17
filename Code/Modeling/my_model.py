@@ -44,7 +44,9 @@ class RandomForest:
     def __init__(self):
         """Klasse für Random Forest"""
         self.df = pd.read_pickle('df.pkl') # Dataframe mit allen Features
-        self.df1, self.feat_gini_importance, self.results_df, self.adabr = data_prep.my_model_options(self.df) # Dataframe mit random forest und adaboost vorhersagen
+        self.df1, self.feat_gini_importance, self.results_df, self.models = data_prep.my_model_options(self.df) # Dataframe mit random forest und adaboost vorhersagen
+        self.adabr = self.models[1]
+        self.rf = self.models[0]
         self.df2 = self.randf_fut_predict()
     
     def randf_fut_predict(self):
@@ -52,11 +54,30 @@ class RandomForest:
         df = future(self.df1)
         miss_randforest_pred = df['randforest_pred'].isna() # Series mit True/False, ob Wert fehlt
         features = df.loc[miss_randforest_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
-        randforest_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
+        randforest_pred = self.rf.predict(features) # Vorhersage der Anzahl der Notrufe
         df.loc[miss_randforest_pred, 'randforest_pred'] = randforest_pred # Füge Vorhersage in df ein wo Wert fehlt
         return df
 
 RandForest = RandomForest()
+
+class AdaBoostClass:
+    def __init__(self):
+        """Klasse für Random Forest"""
+        self.df = pd.read_pickle('df.pkl') # Dataframe mit allen Features
+        self.df1, self.feat_gini_importance, self.results_df, self.models = data_prep.my_model_options(self.df) # Dataframe mit random forest und adaboost vorhersagen
+        self.adabr = self.models[1]
+        self.df2 = self.adaboo_fut_predict()
+    
+    def adaboo_fut_predict(self):
+        """Vorhersage der Anzahl der Notrufe"""
+        df = future(self.df1)
+        miss_adaboost_pred = df['adaboost_pred'].isna() # Series mit True/False, ob Wert fehlt
+        features = df.loc[miss_adaboost_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
+        adaboost_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
+        df.loc[miss_adaboost_pred, 'adaboost_pred'] = adaboost_pred # Füge Vorhersage in df ein wo Wert fehlt
+        return df
+
+AdaBoo = AdaBoostClass()
 
 # Liste-objekt aller Spalten
 columns_reg = list(Reg_Class.df2.columns)
@@ -68,4 +89,6 @@ columns_both.remove('calls_reg_pred')
 
 print(Reg_Class.df2[columns_both].equals(RandForest.df2[columns_both]))
 
-df = pd.concat([Reg_Class.df2, RandForest.df2[['randforest_pred', 'adaboost_pred']]], axis=1)
+df = pd.concat([Reg_Class.df2, RandForest.df2['randforest_pred'], AdaBoo.df2['adaboost_pred']], axis=1)
+
+print(df)

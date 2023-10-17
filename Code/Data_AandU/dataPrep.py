@@ -422,6 +422,8 @@ def my_model_options(df):
     # Random Forest Regressor erstellen
     rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
     adabr = AdaBoostRegressor(n_estimators=100, random_state=42, learning_rate=1) # Teil des Basismodells
+    models = (rf, adabr)
+
 
     # Persist das Modell mit skops
     sio.dump(adabr, 'adaboostreg_model')
@@ -456,14 +458,14 @@ def my_model_options(df):
     results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
     results_df = pd.DataFrame(results, index=[0])
 
-    return df, feature_gini_importance, results_df, adabr
+    return df, feature_gini_importance, results_df, models
 
 def plot_train_test(full_pred_df, df):
     fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
     date = df['date']
     y_1 = df['calls_reg_act_diff']
-    y_2 = full_pred_df['full_pred_rf']
-    y_3 = full_pred_df['full_pred_adabr']
+    y_2 = full_pred_df['randforest_pred']
+    y_3 = full_pred_df['adaboost_pred']
     # Beide y-Achsen in einem figure als Streuungsdiagramme mit kleinen Punkten
     ax_1.scatter(date, y_1, color='red', marker='.')
     ax_2.scatter(date, y_2, color='blue', marker='.')
@@ -471,8 +473,8 @@ def plot_train_test(full_pred_df, df):
     # Achsenbeschriftung
     ax_1.set_xlabel('Datum')
     ax_1.set_ylabel('Calls_reg_act_diff')
-    ax_2.set_ylabel('full_pred_rf')
-    ax_3.set_ylabel('full_pred_adabr')
+    ax_2.set_ylabel('randforest_pred')
+    ax_3.set_ylabel('adaboost_pred')
     
     ax_1.set_title('Calls_reg_act_diff und Predictions')
     
