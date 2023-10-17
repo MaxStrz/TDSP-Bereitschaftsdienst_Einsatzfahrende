@@ -146,16 +146,16 @@ def df_new_columns(df):
     df_2['weekday'] = df_2['date'].dt.weekday # Wochentag als Zahl (Montag = 0, Sonntag = 6)
     df_2['weekofyear'] = df_2['date'].dt.isocalendar().week # Kalenderwoche als Zahl (1-52)
     df_2['dayofyear'] = df_2['date'].dt.dayofyear # Tag des Jahres als Zahl (1-365)
-    df_2['season'] = (df_2['month']-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
     df_2['predict_day'] = df_2['date'] - DateOffset(months=1, day=15) # Datum des 15. des vorherigen Monats
+    df_2['season'] = (df_2['month']-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
+    df_2['day'] = (df_2['date'] - pd.Timestamp('2016-04-01')).dt.days + 1 # Anzahl der Tage seit dem ersten Tag im Datensatz
 
-    # if df_2['sby_need'] exists
-    if 'sby_need' in df_2.columns:
-        # Nachfrage = aktivierter Bdienst + \regulären Dienst - krank gemeldet (wenn 'sby_need' > 0)
-        df_2['demand'] = np.where(df_2['sby_need'] > 0, df_2['sby_need'] + df_2['n_duty'] - df_2['n_sick'], np.nan) 
-    
+    if 'calls' in df_2.columns:
+        df_2['demand'] = np.where(df_2['sby_need'] > 0, df_2['sby_need'] + df_2['n_duty'] - df_2['n_sick'], np.nan)
+        df_2['status'] = 'actual'
+
     else:
-        pass
+        df_2['status'] = 'prediction'
 
     return df_2
 
@@ -392,21 +392,21 @@ def notruf_reg(df):
     # subract calls_pred from calls
     calls_diff = calls - calls_pred
 
-    df['calls_pred'] = calls_pred
+    df['calls_reg_pred'] = calls_pred
 
-    df['calls_diff'] = calls_diff
+    df['calls_reg_act_diff'] = calls_diff
 
     # Streuungsdiagramm mit 'date' auf der x-Achse
     # und 'calls' als Punkte und 'calls_pred' als Linie
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.scatter(df['date'].to_numpy(), y, s=3)
-    ax.plot(df['date'].to_numpy(), df['calls_pred'].to_numpy(), color='red')
+    ax.plot(df['date'].to_numpy(), df['calls_reg_pred'].to_numpy(), color='red')
 
     return df, ax, reg
 
 def notrend_scatter(df):
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(df['date'].to_numpy(), df['calls_diff'].to_numpy(), s=3)
+    ax.scatter(df['date'].to_numpy(), df['calls_reg_act_diff'].to_numpy(), s=3)
 
     #plt.show()
 
@@ -414,7 +414,7 @@ def my_model_options(df):
 
     # Merkmalsvariablen von Zielvariable trennen
     X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_diff']
+    y = df['calls_reg_act_diff']
 
     # Train/Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -461,7 +461,7 @@ def my_model_options(df):
 def plot_train_test(full_pred_df, df):
     fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
     date = df['date']
-    y_1 = df['calls_diff']
+    y_1 = df['calls_reg_act_diff']
     y_2 = full_pred_df['full_pred_rf']
     y_3 = full_pred_df['full_pred_adabr']
     # Beide y-Achsen in einem figure als Streuungsdiagramme mit kleinen Punkten
@@ -470,11 +470,11 @@ def plot_train_test(full_pred_df, df):
     ax_3.scatter(date, y_3, color='green', marker='.')
     # Achsenbeschriftung
     ax_1.set_xlabel('Datum')
-    ax_1.set_ylabel('Calls_diff')
+    ax_1.set_ylabel('Calls_reg_act_diff')
     ax_2.set_ylabel('full_pred_rf')
     ax_3.set_ylabel('full_pred_adabr')
     
-    ax_1.set_title('Calls_diff und Predictions')
+    ax_1.set_title('Calls_reg_act_diff und Predictions')
     
     plt.show()
 
