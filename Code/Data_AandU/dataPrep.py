@@ -378,6 +378,8 @@ def notruf_reg(df):
     y = np.array(df['calls']).reshape(-1, 1)
 
     reg = LinearRegression().fit(x, y)
+    sio.dump(reg, 'linear_reg_model')
+
     reg_score = reg.score(x, y)
 
     calls_pred = reg.predict(x)
@@ -427,6 +429,7 @@ def my_model_options(df):
 
     # Persist das Modell mit skops
     sio.dump(adabr, 'adaboostreg_model')
+    sio.dump(rf, 'randomforestreg_model')
 
     # Trainiere das Modell auf Trainingsdaten
     rf.fit(X_train, y_train)
