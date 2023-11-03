@@ -25,74 +25,26 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 # absolute dir in dem das Skript ist
 current_directory = os.path.dirname(__file__)
 
-def sickness_table_df():
-#     """
-#     Liest die CSV-Datei ein, überprüft die Datenqualität und 
-#     gibt einen DataFrame zurück
-#     """
+class ProjectPaths:
+    def __init__(self, **kwds):
+        self.cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
+        self.raw = os.path.join(self.cd, "../../Sample_Data/Raw/")
 
-    df_build_notes = []
-    
-    class ProjectPaths:
-        def __init__(self, **kwds):
-            self.cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-            self.raw = os.path.join(self.cd, "../../Sample_Data/Raw/")
+class Data(ProjectPaths):
+    def __init__(self, **kwds):
+        super().__init__(**kwds)
+        self.df_build_notes = []
 
-
-    class Data(ProjectPaths):
-        def __init__(self, **kwds):
-            super().__init__(**kwds)
+    def make_df_sickness_table(self):
+        filepath = self.raw + 'sickness_table.csv'
+        self.df_sickness_table = pd.read_csv(filepath, 
+                                             index_col=0, 
+                                             parse_dates=['date'])
         
-        def make_df_sickness_table(self):
-            filepath = self.raw + 'sickness_table.csv'
-            df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
-            self.df_sickness_table = df
-
-    my_data = Data()
-    my_data.make_df_sickness_table()
-    df = my_data.df_sickness_table
-
-    df = my_data.df_sickness_table
-
-#     def csv_filepath2df_2():
-#         """
-#         Verwendet absoluten Pfad des Skripts und relativen 
-#         Pfad zur CSV-Datei um einen DataFrame zu erstellen
-#         """
-#         # absolute dir the script is in + path to csv from script
-#         csv_name = 'sickness_table.csv'
-#         filepath = ProjektPaths().raw + csv_name
-#         df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
-
-#         # Bestätigung, dass die CSV-Datei erfolgreich in einen 
-#         # DataFrame umgewandelt wurde
-#         note = "Daten erfolgreich in einen DataFrame umgewandelt"
-#         df_build_notes.append(note)
-
-#         return df
+        note = "Daten erfolgreich in einen DataFrame umgewandelt"
+        self.df_build_notes.append(note)
     
-#     dft = csv_filepath2df_2()
-#     print(dft)
-
-#     def csv_filepath2df(relative_path):
-#         """
-#         Verwendet absoluten Pfad des Skripts und relativen 
-#         Pfad zur CSV-Datei um einen DataFrame zu erstellen
-#         """
-#         # absolute dir the script is in + path to csv from script
-#         filepath = os.path.join(current_directory, relative_path)
-#         df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
-
-#         # Bestätigung, dass die CSV-Datei erfolgreich in einen 
-#         # DataFrame umgewandelt wurde
-#         note = "Daten erfolgreich in einen DataFrame umgewandelt"
-#         df_build_notes.append(note)
-
-#         return df
-    
-#     df = csv_filepath2df("../../Sample_Data/Raw/sickness_table.csv")
-
-    def missing_data(df):
+    def missing_data(self):
         """
         Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
         gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
@@ -111,21 +63,22 @@ def sickness_table_df():
         # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
         # pd.Series mit Spalten als Index und Wert True wenn es 
         # fehlende Daten gibt, sonst False
-        missing_data = df.isnull().any()
+        missing_data = self.df_sickness_table.isnull().any()
         if missing_data.any():
             # for-Schleife um die fehlenden Daten in der jeweiligen 
             # Spalte zu finden
             for col in missing_data.index:
                 # enumerate() gibt den Index und Wert jedes Elements 
                 # in der Spalte aus
-                for index, value in enumerate(df[col]):
+                for index, value in enumerate(self.df_sickness_table[col]):
                     if pd.isna(value):
                         # Füge die Spalte, das Datum und den Index des 
                         # fehlenden Wertes in die Liste ein
-                        df_build_notes.append(f"Es fehlen Daten in "
-                                              f"Spalte: {col}, "
-                                              f"Datum: {df['date'][index]}, "
-                                              f"Index: {index}")
+                        note = (f"Es fehlen Daten in "f"Spalte: {col}, "
+                                f"Datum: "
+                                f"{self.df_sickness_table['date'][index]}, "
+                                f"Index: {index}")
+                        self.df_build_notes.append(note)
                     else:
                         continue
             # Drücke die nicht vollständige Liste df_build_notes aus
@@ -133,9 +86,66 @@ def sickness_table_df():
         
             raise ValueError("Fehlende Daten in der CSV-Datei")
         else:
-            df_build_notes.append("Keine fehlenden Daten in der CSV-Datei")
+            note = "Keine fehlenden Daten in der CSV-Datei"
+            self.df_build_notes.append(note)
     
-    missing_data(df)
+
+
+def sickness_table_df(df):
+#     """
+#     Liest die CSV-Datei ein, überprüft die Datenqualität und 
+#     gibt einen DataFrame zurück
+#     """
+
+    df_build_notes = []
+    
+
+
+    # def missing_data(df):
+    #     """
+    #     Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
+    #     gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
+    #     Liste von fehlenden Daten aus.
+
+    #     Args:
+    #         df (pandas.DataFrame): Der DataFrame, der überprüft 
+    #         werden soll.
+
+    #     Raises:
+    #         ValueError: Wenn es fehlende Daten in der CSV-Datei gibt.
+
+    #     Returns:
+    #         None
+    #     """
+    #     # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
+    #     # pd.Series mit Spalten als Index und Wert True wenn es 
+    #     # fehlende Daten gibt, sonst False
+    #     missing_data = df.isnull().any()
+    #     if missing_data.any():
+    #         # for-Schleife um die fehlenden Daten in der jeweiligen 
+    #         # Spalte zu finden
+    #         for col in missing_data.index:
+    #             # enumerate() gibt den Index und Wert jedes Elements 
+    #             # in der Spalte aus
+    #             for index, value in enumerate(df[col]):
+    #                 if pd.isna(value):
+    #                     # Füge die Spalte, das Datum und den Index des 
+    #                     # fehlenden Wertes in die Liste ein
+    #                     df_build_notes.append(f"Es fehlen Daten in "
+    #                                           f"Spalte: {col}, "
+    #                                           f"Datum: {df['date'][index]}, "
+    #                                           f"Index: {index}")
+    #                 else:
+    #                     continue
+    #         # Drücke die nicht vollständige Liste df_build_notes aus
+    #         [print(notes) for notes in df_build_notes]
+        
+    #         raise ValueError("Fehlende Daten in der CSV-Datei")
+    #     else:
+    #         df_build_notes.append("Keine fehlenden Daten in der CSV-Datei")
+    
+
+    # missing_data(df)
     
     def sind_sie_ganzzahlig(df):
         # Leere Liste für nicht-ganzzahlige Werte

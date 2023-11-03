@@ -11,8 +11,19 @@ import Code.Modeling.base_models as base_models
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
 
+my_data = data_prep.Data()
+
+my_data.make_df_sickness_table()
+
+my_data.missing_data()
+
+print(my_data.df_build_notes)
+
+
+df = my_data.df_sickness_table
+
 # Lade Daten aus csv und überprüfe die Qualität der Daten
-df, df_build_notes, summary_list = data_prep.sickness_table_df()
+df, df_build_notes, summary_list = data_prep.sickness_table_df(df)
 
 # stop running program here
 sys.exit()
