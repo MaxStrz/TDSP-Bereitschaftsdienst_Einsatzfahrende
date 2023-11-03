@@ -41,18 +41,19 @@ def sickness_table_df():
 
     class Data(ProjectPaths):
         def __init__(self, **kwds):
-            self.df_sickness_table = None
             super().__init__(**kwds)
         
-        def make_sickness_table(self):
-            csv_name = 'sickness_table.csv'
-            filepath = self.raw + csv_name
+        def make_df_sickness_table(self):
+            filepath = self.raw + 'sickness_table.csv'
             df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
             self.df_sickness_table = df
-            return df
 
     my_data = Data()
-    df = my_data.make_sickness_table()
+    my_data.make_df_sickness_table()
+    df = my_data.df_sickness_table
+
+    df = my_data.df_sickness_table
+
 #     def csv_filepath2df_2():
 #         """
 #         Verwendet absoluten Pfad des Skripts und relativen 
