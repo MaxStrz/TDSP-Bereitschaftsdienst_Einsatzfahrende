@@ -26,30 +26,70 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 current_directory = os.path.dirname(__file__)
 
 def sickness_table_df():
-    """
-    Liest die CSV-Datei ein, überprüft die Datenqualität und 
-    gibt einen DataFrame zurück
-    """
+#     """
+#     Liest die CSV-Datei ein, überprüft die Datenqualität und 
+#     gibt einen DataFrame zurück
+#     """
 
     df_build_notes = []
     
-    def csv_filepath2df(relative_path):
-        """
-        Verwendet absoluten Pfad des Skripts und relativen 
-        Pfad zur CSV-Datei um einen DataFrame zu erstellen
-        """
-        # absolute dir the script is in + path to csv from script
-        filepath = os.path.join(current_directory, relative_path)
-        df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
+    class ProjectPaths:
+        def __init__(self, **kwds):
+            self.cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
+            self.raw = os.path.join(self.cd, "../../Sample_Data/Raw/")
 
-        # Bestätigung, dass die CSV-Datei erfolgreich in einen 
-        # DataFrame umgewandelt wurde
-        note = "Daten erfolgreich in einen DataFrame umgewandelt"
-        df_build_notes.append(note)
 
-        return df
+    class Data(ProjectPaths):
+        def __init__(self, **kwds):
+            self.df_sickness_table = None
+            super().__init__(**kwds)
+        
+        def make_sickness_table(self):
+            csv_name = 'sickness_table.csv'
+            filepath = self.raw + csv_name
+            df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
+            self.df_sickness_table = df
+            return df
+
+    my_data = Data()
+    df = my_data.make_sickness_table()
+#     def csv_filepath2df_2():
+#         """
+#         Verwendet absoluten Pfad des Skripts und relativen 
+#         Pfad zur CSV-Datei um einen DataFrame zu erstellen
+#         """
+#         # absolute dir the script is in + path to csv from script
+#         csv_name = 'sickness_table.csv'
+#         filepath = ProjektPaths().raw + csv_name
+#         df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
+
+#         # Bestätigung, dass die CSV-Datei erfolgreich in einen 
+#         # DataFrame umgewandelt wurde
+#         note = "Daten erfolgreich in einen DataFrame umgewandelt"
+#         df_build_notes.append(note)
+
+#         return df
     
-    df = csv_filepath2df("../../Sample_Data/Raw/sickness_table.csv")
+#     dft = csv_filepath2df_2()
+#     print(dft)
+
+#     def csv_filepath2df(relative_path):
+#         """
+#         Verwendet absoluten Pfad des Skripts und relativen 
+#         Pfad zur CSV-Datei um einen DataFrame zu erstellen
+#         """
+#         # absolute dir the script is in + path to csv from script
+#         filepath = os.path.join(current_directory, relative_path)
+#         df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
+
+#         # Bestätigung, dass die CSV-Datei erfolgreich in einen 
+#         # DataFrame umgewandelt wurde
+#         note = "Daten erfolgreich in einen DataFrame umgewandelt"
+#         df_build_notes.append(note)
+
+#         return df
+    
+#     df = csv_filepath2df("../../Sample_Data/Raw/sickness_table.csv")
 
     def missing_data(df):
         """
@@ -404,7 +444,7 @@ def notrufe_demand_reg(df_dem_pred):
 
     reg = LinearRegression().fit(x, y)
     # Persist das Modell mit skops
-    sio.dump(reg, f'{current_directory}\\model_linear_reg_demand')
+    sio.dump(reg, f'{current_directory}\\model_linear_reg_demand.skops')
     reg_score = reg.score(x, y)
 
     demand_pred = reg.predict(np.array(df_dem_pred['calls']).reshape(-1, 1))
@@ -429,7 +469,7 @@ def notruf_reg(df):
 
     reg = LinearRegression().fit(x, y)
     # Persist das Modell mit skops
-    sio.dump(reg, f'{current_directory}\\..\\Modeling\\model_linear_reg')
+    sio.dump(reg, f'{current_directory}\\..\\Modeling\\model_linear_reg.scops')
 
     reg_score = reg.score(x, y)
 
@@ -551,18 +591,27 @@ def my_model_options(df):
     # Merkmalsvariablen von Zielvariable trennen
     X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
     y = df['calls_reg_act_diff']
-
-    # Train/Test Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train = X[:-47]
+    y_train = y[:-47]
+    X_test = X[-47:]
+    y_test = y[-47:]
 
     # Random Forest Regressor erstellen
     rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
-    adabr = AdaBoostRegressor(n_estimators=100, random_state=42, learning_rate=1) # Teil des Basismodells
+
+    estimator = DecisionTreeRegressor(max_depth=5, min_samples_split=3)
+    adabr = AdaBoostRegressor(estimator=estimator,
+                              n_estimators=130, 
+                              random_state=42, 
+                              learning_rate=0.36)
     models = [rf, adabr]
 
+    rf.fit(X_train, y_train)
+    adabr.fit(X_train, y_train)
+
     # Persist das Modell mit skops
-    sio.dump(adabr, 'Code\\Modeling\\model_adaboostreg')
-    sio.dump(rf, 'Code\\Modeling\\model_randomforestreg')
+    sio.dump(adabr, f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops')
+    sio.dump(rf, f'{current_directory}\\..\\Modeling\\model_randomforestreg.skops')
 
     # Sorted Feature Importance
     feature_gini_importance = pd.Series(rf.feature_importances_, index=X_train.columns)
@@ -574,6 +623,7 @@ def my_model_options(df):
     # Series der Vorhersagen aller X-Werte
     full_pred_rf = rf.predict(X)
     full_pred_adabr = adabr.predict(X)
+
 
     # Vorhersagen der Modelle in den DataFrame einfügen
     df['randforest_pred'] = full_pred_rf
@@ -692,8 +742,6 @@ def model_cross_val(df):
     model_performance.to_csv(f'{current_directory}\\model_performance_2.csv',
                              sep=';', decimal=',')
     
-    print(model_performance)
-
 def adaboo_gscv(df):
 
     # Merkmalsvariablen von Zielvariable trennen
@@ -707,12 +755,12 @@ def adaboo_gscv(df):
                    'absolute_error']
     
     # Parameter für GridSearchCV
-    param_grid = {"n_estimators":[135, 140, 145],
-                  'learning_rate':[0.36, 0.35, 0.34],
+    param_grid = {"n_estimators":[135, 140],
+                  #'learning_rate':[0.36, 0.35, 0.34],
                   #"estimator__criterion":d_tree_crit,
                   #"estimator__splitter":"best",
-                  "estimator__max_depth":[2, 3, 4, 8],
-                  "estimator__min_samples_split":[2, 5]
+                  #"estimator__max_depth":[2, 3, 4, 8],
+                  #"estimator__min_samples_split":[2, 5]
                   }
 
     # adaboost regressor erstellen
@@ -734,3 +782,82 @@ def adaboo_gscv(df):
 
     # speichere das DataFrame als pickle
     appended.to_pickle(f'{current_directory}\\adaboo_gscv_df.pkl')
+
+def demand_pred_final(df2, trend_reg, calls_demand_reg):
+
+    startdate = np.datetime64('2016-04-01')
+    x2 = np.array((df2['date']-startdate).dt.days + 1).reshape(-1, 1)
+    trend_2 = trend_reg.predict(x2)
+    calls_pred_2 = (np.round(trend_2, 0)).astype(int)
+    df2['calls_reg_pred_2'] = calls_pred_2.reshape(-1)
+
+    df2['reg_adaboost_pred'] = df2['calls_reg_pred_2'] + df2['adaboost_pred']
+
+    # Nachfrage basierend auf reg_adaboost_pred
+    x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
+    nachfrage_pred = calls_demand_reg.predict(x_calls)
+    df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
+
+    return df2
+
+def actual_vs_pred(df3):
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    ax.scatter(df3['date'], df3['demand_pred'], s=3, color='blue')
+    ax.scatter(df3['date'], df3['nachfrage_pred'], s=3, color='red')
+
+    ax.set_title('Actual vs. Predicted Demand')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Demand')
+
+    plt.savefig(f'{current_directory}\\demand_vs_adaboo.jpg')
+
+def future_predictions(AdaBoo, trend_reg, calls_demand_reg):
+
+    df2 = AdaBoo.df2
+
+    df3 = demand_pred_final(df2, trend_reg, calls_demand_reg)
+ 
+    df3['sby_pred'] = df3['nachfrage_pred'] - df3['n_duty']
+
+    actual_vs_pred(df3)
+
+    return df3
+
+def s_sby_need(date):
+
+    date = [np.datetime64(date) for date in date]
+
+    # Regression für Notrufe
+    skop_reg = f'{current_directory}\\..\\Modeling\\model_linear_reg.scops'
+    reg_trend = sio.load(skop_reg, trusted=True)
+    startdate = np.datetime64('2016-04-01')
+    x = np.array((date-startdate).astype('timedelta64[D]') + np.timedelta64(1, 'D'))
+
+    # numpy array aus series date
+    x = x.reshape(-1, 1).astype(int)
+    reg_pred = reg_trend.predict(x).reshape(-1)
+
+    # Vorhersage des AdaBoost-Regressors
+    skop_adaboost = f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops'
+    model_adaboostreg = sio.load(skop_adaboost, trusted=True)
+    date_df = pd.DataFrame(date, columns=['date'])
+    df_pred = new_features(date_df)
+    df_pred_2 = df_pred[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
+    ada_pred = model_adaboostreg.predict(df_pred_2).reshape(-1)
+
+    # gesamte Vorhersage von Notrufen
+    pred = reg_pred + ada_pred
+
+    # Vorhersage der Nachfrage an Einsatzfahrenden
+    skop_demand = f'{current_directory}\\model_linear_reg_demand.skops'
+    model_demand = sio.load(skop_demand, trusted=True)
+    sby_plus_duty = model_demand.predict(pred.reshape(-1, 1))
+
+    # Subtrahieren von n_duty, vorausgestetzt n_duty ist 1900
+    sby_need = np.round(((sby_plus_duty - 1900).reshape(-1)), 0).astype(int)
+
+    sby_need_series = pd.Series(sby_need, index=date, name='sby_need_pred')
+
+    return sby_need_series
+

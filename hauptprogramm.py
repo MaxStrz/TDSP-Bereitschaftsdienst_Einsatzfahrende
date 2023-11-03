@@ -14,6 +14,9 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 # Lade Daten aus csv und überprüfe die Qualität der Daten
 df, df_build_notes, summary_list = data_prep.sickness_table_df()
 
+# stop running program here
+sys.exit()
+
 data_prep.overview_scatter(df)
 
 # Erstelle neue Spalten wie 'demand'
@@ -24,10 +27,10 @@ data_prep.demand_vs_calls(df)
 
 # Erstelle lineares Regressionsmodell für das Verhältnis zwischen der Anzahl der Notrufe
 # und der Anzahle an gebrauchten Einsatzfahrenden
-reg, reg_score, df = data_prep.notrufe_demand_reg(df)
+calls_demand_reg, reg_score, df = data_prep.notrufe_demand_reg(df)
 
 # Erstelle lineares Regressionsmodell für den allgemeinen Trend der Anzahl der Notrufe
-df, ax, reg, reg_score = data_prep.notruf_reg(df)
+df, ax, trend_reg, reg_score = data_prep.notruf_reg(df)
 
 data_prep.no_trend_scatter(df)
 
@@ -43,15 +46,26 @@ df1.to_csv('Code\\Analysis\\new_features.csv', sep=';', decimal=',')
 data_prep.model_cross_val(df1)
 
 # GridSearchCV für AdaBoost um die besten Parameter zu finden
-data_prep.adaboo_gscv(df1)
+# data_prep.adaboo_gscv(df1)
 
-# stop running program here
-sys.exit()
-
-# Erstelle eigene Klassenobjekte für lineares Regressionsmodell, Random Forest und AdaBoost
-Reg_Class = base_models.TrendRegression(df1) # Erstellen eines Klassenobjekts für das Regressionsmodell
+# Erstelle eigene Klassenobjekte für AdaBoost
 AdaBoo = base_models.AdaBoostClass(df1)
-RandForest = base_models.RandomForest(df1)
+
+# Mache zukünftige Vorhersagen und speichere Streuungsdiagramm davon
+df3 = data_prep.future_predictions(AdaBoo, trend_reg, calls_demand_reg)
+
+# Funktion die das Datum annimmt und die Anzahl der notwendigen 
+# Einsatzfahrten im Bereitschaftsdienst für diesen Tag zurückgibt
+dates = ['2019-07-08', '2019-07-09', '2019-07-10']
+
+# pandas Series aus dates. Datentyp muss datetime sein
+s_sby_need = data_prep.s_sby_need(dates)
+
+print(s_sby_need)
+
+
+
+df2 = AdaBoo.df2
 
 # Füge Vorhersagen der Klassenobjekte in df ein
 df = pd.concat([Reg_Class.df2, RandForest.df2['randforest_pred'], AdaBoo.df2['adaboost_pred']], axis=1)
