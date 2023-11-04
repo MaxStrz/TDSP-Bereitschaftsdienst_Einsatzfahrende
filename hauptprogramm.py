@@ -19,6 +19,8 @@ my_data.missing()
 
 my_data.is_int()
 
+my_data.missing_dates()
+
 print(my_data.df_build_notes)
 
 df = my_data.df

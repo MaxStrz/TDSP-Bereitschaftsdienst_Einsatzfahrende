@@ -124,6 +124,24 @@ class Data(ProjectPaths):
             note = f"Keine nicht-ganzzahligen Werte in den Spalten {cols}"
             self.df_build_notes.append(note)
 
+    def missing_dates(self):
+        """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
+        start_date = self.df['date'].min()
+        end_date = self.df['date'].max()
+        date_range = pd.date_range(start=start_date, end=end_date)
+        missing_dates = []
+        for date in date_range:
+            if date not in self.df['date'].values:
+                missing_dates.append(date)
+        if len(missing_dates) == 0:
+            note = "Alle Daten zwischen Start- und Enddatum vorhanden"
+            self.df_build_notes.append(note)
+        else:
+            print(f"Es fehlen {len(missing_dates)} "
+                  f"Daten zwischen Start- und Enddatum")
+            print(f"Die fehlenden Daten sind: {missing_dates}")
+            raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
+        
 def sickness_table_df(df):
 #     """
 #     Liest die CSV-Datei ein, überprüft die Datenqualität und 
@@ -131,37 +149,6 @@ def sickness_table_df(df):
 #     """
 
     df_build_notes = []
-    
-    def sind_sie_ganzzahlig(df):
-        # Leere Liste für nicht-ganzzahlige Werte
-        non_int_list = []
-        # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
-        # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
-        # Interger-Wert sind. Wenn nicht, raise error und gebe das Datum
-        #  aus der 'date'-Spalte und Index des fehlerhaften Wertes aus.
-        for col in ['calls', 'sby_need', 'dafted', 
-                    'n_sick', 'n_duty', 'n_sby']:
-            for index, value in enumerate(df[col]):
-                if value != int(value):
-                    # Füge die Spalte, das Datum und den Index des 
-                    # fehlenden Wertes in die Liste ein
-                    non_int_list.append([col, df['date'][index], index])
-                else:
-                    continue
-        
-        # Wenn die Liste nicht leer ist, beschreibe die 
-        # fehlerhaften Daten und raise error
-        if len(non_int_list) != 0:
-            print(f"Es gibt {len(non_int_list)} nicht-ganzzahlige "
-                  f"Werte im Datensatz:")
-            for data in non_int_list:
-                print(f"Spalte: {data[0]}, Datum: {data[1]}, "
-                      f"Index: {data[2]}")
-            raise ValueError("Nicht-ganzzahlige Werte in den Spalten 'calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby'")
-        else:
-            df_build_notes.append("Keine nicht-ganzzahligen Werte in den Spalten 'n_sick', 'calls', 'n_duty', 'n_sby', 'sby_need', 'dafted'")
-
-    sind_sie_ganzzahlig(df)
 
     def alle_daten_vorhanden(df):
         """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
