@@ -63,20 +63,19 @@ class Data(ProjectPaths):
         # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
         # pd.Series mit Spalten als Index und Wert True wenn es 
         # fehlende Daten gibt, sonst False
-        missing_data = self.df_sickness_table.isnull().any()
+        df = self.df_sickness_table
+        missing_data = df.isnull().any()
         if missing_data.any():
             # for-Schleife um die fehlenden Daten in der jeweiligen 
             # Spalte zu finden
             for col in missing_data.index:
                 # enumerate() gibt den Index und Wert jedes Elements 
                 # in der Spalte aus
-                for index, value in enumerate(self.df_sickness_table[col]):
+                for index, value in enumerate(df[col]):
                     if pd.isna(value):
                         # Füge die Spalte, das Datum und den Index des 
                         # fehlenden Wertes in die Liste ein
-                        note = (f"Es fehlen Daten in "f"Spalte: {col}, "
-                                f"Datum: "
-                                f"{self.df_sickness_table['date'][index]}, "
+                        note = (f"Es fehlen Daten in Spalte: {col}, "
                                 f"Index: {index}")
                         self.df_build_notes.append(note)
                     else:
@@ -90,7 +89,6 @@ class Data(ProjectPaths):
             self.df_build_notes.append(note)
     
 
-
 def sickness_table_df(df):
 #     """
 #     Liest die CSV-Datei ein, überprüft die Datenqualität und 
@@ -98,54 +96,6 @@ def sickness_table_df(df):
 #     """
 
     df_build_notes = []
-    
-
-
-    # def missing_data(df):
-    #     """
-    #     Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
-    #     gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
-    #     Liste von fehlenden Daten aus.
-
-    #     Args:
-    #         df (pandas.DataFrame): Der DataFrame, der überprüft 
-    #         werden soll.
-
-    #     Raises:
-    #         ValueError: Wenn es fehlende Daten in der CSV-Datei gibt.
-
-    #     Returns:
-    #         None
-    #     """
-    #     # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
-    #     # pd.Series mit Spalten als Index und Wert True wenn es 
-    #     # fehlende Daten gibt, sonst False
-    #     missing_data = df.isnull().any()
-    #     if missing_data.any():
-    #         # for-Schleife um die fehlenden Daten in der jeweiligen 
-    #         # Spalte zu finden
-    #         for col in missing_data.index:
-    #             # enumerate() gibt den Index und Wert jedes Elements 
-    #             # in der Spalte aus
-    #             for index, value in enumerate(df[col]):
-    #                 if pd.isna(value):
-    #                     # Füge die Spalte, das Datum und den Index des 
-    #                     # fehlenden Wertes in die Liste ein
-    #                     df_build_notes.append(f"Es fehlen Daten in "
-    #                                           f"Spalte: {col}, "
-    #                                           f"Datum: {df['date'][index]}, "
-    #                                           f"Index: {index}")
-    #                 else:
-    #                     continue
-    #         # Drücke die nicht vollständige Liste df_build_notes aus
-    #         [print(notes) for notes in df_build_notes]
-        
-    #         raise ValueError("Fehlende Daten in der CSV-Datei")
-    #     else:
-    #         df_build_notes.append("Keine fehlenden Daten in der CSV-Datei")
-    
-
-    # missing_data(df)
     
     def sind_sie_ganzzahlig(df):
         # Leere Liste für nicht-ganzzahlige Werte
