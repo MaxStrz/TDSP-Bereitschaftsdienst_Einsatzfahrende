@@ -15,12 +15,13 @@ my_data = data_prep.Data()
 
 my_data.make_df_sickness_table()
 
-my_data.missing_data()
+my_data.missing()
+
+my_data.is_int()
 
 print(my_data.df_build_notes)
 
-
-df = my_data.df_sickness_table
+df = my_data.df
 
 # Lade Daten aus csv und überprüfe die Qualität der Daten
 df, df_build_notes, summary_list = data_prep.sickness_table_df(df)

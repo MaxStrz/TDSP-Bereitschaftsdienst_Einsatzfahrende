@@ -37,14 +37,14 @@ class Data(ProjectPaths):
 
     def make_df_sickness_table(self):
         filepath = self.raw + 'sickness_table.csv'
-        self.df_sickness_table = pd.read_csv(filepath, 
+        self.df = pd.read_csv(filepath, 
                                              index_col=0, 
                                              parse_dates=['date'])
         
         note = "Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
     
-    def missing_data(self):
+    def missing(self):
         """
         Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
         gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
@@ -63,15 +63,14 @@ class Data(ProjectPaths):
         # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
         # pd.Series mit Spalten als Index und Wert True wenn es 
         # fehlende Daten gibt, sonst False
-        df = self.df_sickness_table
-        missing_data = df.isnull().any()
-        if missing_data.any():
+        df_missing = self.df.isnull().any()
+        if df_missing.any():
             # for-Schleife um die fehlenden Daten in der jeweiligen 
             # Spalte zu finden
-            for col in missing_data.index:
+            for col in df_missing.index:
                 # enumerate() gibt den Index und Wert jedes Elements 
                 # in der Spalte aus
-                for index, value in enumerate(df[col]):
+                for index, value in enumerate(self.df[col]):
                     if pd.isna(value):
                         # Füge die Spalte, das Datum und den Index des 
                         # fehlenden Wertes in die Liste ein
@@ -87,7 +86,43 @@ class Data(ProjectPaths):
         else:
             note = "Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
-    
+
+    def is_int(self):
+
+        # Leere Liste für nicht-ganzzahlige Werte
+        non_int_list = []
+
+        # Spalten die ganzzahlig sein müssen
+        int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
+
+        # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
+        # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
+        # Interger-Wert sind. Wenn nicht, raise error und gebe das Datum
+        #  aus der 'date'-Spalte und Index des fehlerhaften Wertes aus.
+        for col in int_cols:
+            for index, value in enumerate(self.df[col]):
+                # Drücke ganze Zeile von index aus
+                if value != int(value):
+                    # Füge die Spalte, das Datum und den Index des 
+                    # fehlenden Wertes in die Liste ein
+                    non_int_list.append([col, self.df.loc[index]])
+                else:
+                    continue
+        
+        # Wenn die Liste nicht leer ist, beschreibe die 
+        # fehlerhaften Daten und raise error
+        if len(non_int_list) != 0:
+            print(f"Es gibt {len(non_int_list)} nicht-ganzzahlige "
+                    f"Werte im Datensatz:")
+            for data in non_int_list:
+                print(f"Spalte: {data[0]}, Zeile: {data[1]}")
+
+            note = f"Nicht-ganzzahlige Werte in den Spalten {int_cols}"
+            raise ValueError(note)
+        else:
+            cols = ", ".join([str(col) for col in int_cols])
+            note = f"Keine nicht-ganzzahligen Werte in den Spalten {cols}"
+            self.df_build_notes.append(note)
 
 def sickness_table_df(df):
 #     """
