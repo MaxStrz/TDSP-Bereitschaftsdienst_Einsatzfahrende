@@ -13,13 +13,15 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 
 my_data = data_prep.Data()
 
-my_data.make_df_sickness_table()
+my_data.make_df()
 
 my_data.missing()
 
 my_data.is_int()
 
 my_data.missing_dates()
+
+my_data.set_data_types()
 
 print(my_data.df_build_notes)
 

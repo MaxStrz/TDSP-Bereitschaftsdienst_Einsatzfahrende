@@ -35,7 +35,7 @@ class Data(ProjectPaths):
         super().__init__(**kwds)
         self.df_build_notes = []
 
-    def make_df_sickness_table(self):
+    def make_df(self):
         filepath = self.raw + 'sickness_table.csv'
         self.df = pd.read_csv(filepath, 
                                              index_col=0, 
@@ -141,7 +141,25 @@ class Data(ProjectPaths):
                   f"Daten zwischen Start- und Enddatum")
             print(f"Die fehlenden Daten sind: {missing_dates}")
             raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
-        
+
+    def set_data_types(self):
+        # Alle Spalten außer 'date' in Integer umwandeln
+        int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
+        for col in int_cols:
+            self.df[col] = self.df[col].astype(int)
+
+        # Bestätigung, dass alle Spalten außer 'date' in Integer 
+        # umgewandelt wurden
+        note = "Alle Spalten ausser 'date' in Integer umgewandelt"
+        self.df_build_notes.append(note)
+
+        # 'date'-Spalte in Datetime umwandeln
+        self.df['date'] = pd.to_datetime(self.df['date'])
+
+        # Bestätigung, dass alle Daten in der 'date'-Spalte Datetime sind
+        note = "Alle Daten in der 'date'-Spalte sind Datetime-Datentyp"
+        self.df_build_notes.append(note)
+
 def sickness_table_df(df):
 #     """
 #     Liest die CSV-Datei ein, überprüft die Datenqualität und 
@@ -149,43 +167,6 @@ def sickness_table_df(df):
 #     """
 
     df_build_notes = []
-
-    def alle_daten_vorhanden(df):
-        """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
-        start_date = df['date'].min()
-        end_date = df['date'].max()
-        date_range = pd.date_range(start=start_date, end=end_date)
-        missing_dates = []
-        for date in date_range:
-            if date not in df['date'].values:
-                missing_dates.append(date)
-        if len(missing_dates) == 0:
-            df_build_notes.append("Alle Daten zwischen Start- und Enddatum vorhanden")
-        else:
-            print(f"Es fehlen {len(missing_dates)} Daten zwischen Start- und Enddatum")
-            print(f"Die fehlenden Daten sind: {missing_dates}")
-        
-        return df
-    
-    df = alle_daten_vorhanden(df)
-
-    def daten_typen_umwandeln(df):
-        # Alle Spalten außer 'date' in Integer umwandeln
-        for col in ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']:
-            df[col] = df[col].astype(int)
-
-        # Bestätigung, dass alle Spalten außer 'date' in Integer umgewandelt wurden
-        df_build_notes.append("Alle Spalten ausser 'date' in Integer umgewandelt")
-
-        # 'date'-Spalte in Datetime umwandeln
-        df['date'] = pd.to_datetime(df['date'])
-
-        # Bestätigung, dass alle Daten in der 'date'-Spalte Datetime sind
-        df_build_notes.append("Alle Daten in der 'date'-Spalte sind Datetime-Datentyp")
-
-        return df
-    
-    df = daten_typen_umwandeln(df)
 
     def df_summary(df):
         """Gibt eine Zusammenfassung des DataFrames aus"""
