@@ -41,7 +41,7 @@ class Data(ProjectPaths):
                                              index_col=0, 
                                              parse_dates=['date'])
         
-        note = "Daten erfolgreich in einen DataFrame umgewandelt"
+        note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
     
     def missing(self):
@@ -74,8 +74,9 @@ class Data(ProjectPaths):
                     if pd.isna(value):
                         # Füge die Spalte, das Datum und den Index des 
                         # fehlenden Wertes in die Liste ein
-                        note = (f"Es fehlen Daten in Spalte: {col}, "
-                                f"Index: {index}")
+                        note = (f"Nicht erfolgreich:\n"
+                                f"Es fehlen Daten in Spalte: "
+                                f"{col}, Index: {index}")
                         self.df_build_notes.append(note)
                     else:
                         continue
@@ -84,7 +85,7 @@ class Data(ProjectPaths):
         
             raise ValueError("Fehlende Daten in der CSV-Datei")
         else:
-            note = "Keine fehlenden Daten in der CSV-Datei"
+            note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
 
     def is_int(self):
@@ -121,7 +122,7 @@ class Data(ProjectPaths):
             raise ValueError(note)
         else:
             cols = ", ".join([str(col) for col in int_cols])
-            note = f"Keine nicht-ganzzahligen Werte in den Spalten {cols}"
+            note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
             self.df_build_notes.append(note)
 
     def missing_dates(self):
@@ -134,7 +135,7 @@ class Data(ProjectPaths):
             if date not in self.df['date'].values:
                 missing_dates.append(date)
         if len(missing_dates) == 0:
-            note = "Alle Daten zwischen Start- und Enddatum vorhanden"
+            note = "Erfolgreich: Alle Daten zwischen Start- und Enddatum vorhanden"
             self.df_build_notes.append(note)
         else:
             print(f"Es fehlen {len(missing_dates)} "
@@ -150,15 +151,31 @@ class Data(ProjectPaths):
 
         # Bestätigung, dass alle Spalten außer 'date' in Integer 
         # umgewandelt wurden
-        note = "Alle Spalten ausser 'date' in Integer umgewandelt"
+        note = "Erfolgreich: Alle Spalten ausser 'date' in Integer umgewandelt"
         self.df_build_notes.append(note)
 
         # 'date'-Spalte in Datetime umwandeln
         self.df['date'] = pd.to_datetime(self.df['date'])
 
         # Bestätigung, dass alle Daten in der 'date'-Spalte Datetime sind
-        note = "Alle Daten in der 'date'-Spalte sind Datetime-Datentyp"
+        note = "Erfolgreich: Alle Daten in der 'date'-Spalte sind Datetime-Datentyp"
         self.df_build_notes.append(note)
+
+    def df_summary(self):
+            """Gibt eine Zusammenfassung des DataFrames aus"""
+
+            self.df.describe().to_csv(f"{self.cd}\\df_description.csv",
+                                      sep=';', decimal=',')
+            summary_list = []
+            summary_list.append("\nDataframe Info:")
+            summary_list.append(self.df.describe())
+            summary_list.append(self.df.head())
+            summary_list.append(self.df.tail())
+
+            self.summary_list = summary_list
+
+            note = "Erfolgreich: Zusammenfassung des DataFrames als summary_list erstellt"
+            self.df_build_notes.append(note)
 
 def sickness_table_df(df):
 #     """
@@ -167,6 +184,7 @@ def sickness_table_df(df):
 #     """
 
     df_build_notes = []
+
 
     def df_summary(df):
         """Gibt eine Zusammenfassung des DataFrames aus"""

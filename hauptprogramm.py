@@ -23,7 +23,10 @@ my_data.missing_dates()
 
 my_data.set_data_types()
 
-print(my_data.df_build_notes)
+my_data.df_summary()
+
+for note in my_data.df_build_notes:
+    print(note)
 
 df = my_data.df
 
