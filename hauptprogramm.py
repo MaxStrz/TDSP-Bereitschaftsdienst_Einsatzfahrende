@@ -17,7 +17,8 @@ my_data.make_df()
 
 my_data.missing()
 
-my_data.is_int()
+int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
+my_data.is_whole_int(int_cols)
 
 my_data.missing_dates()
 
@@ -28,10 +29,11 @@ my_data.df_summary()
 for note in my_data.df_build_notes:
     print(note)
 
+my_data.create_demand()
+my_data.n_sick_adjusted()
+my_data.date_features()
+print(my_data.df)
 df = my_data.df
-
-# Lade Daten aus csv und überprüfe die Qualität der Daten
-df, df_build_notes, summary_list = data_prep.sickness_table_df(df)
 
 # stop running program here
 sys.exit()

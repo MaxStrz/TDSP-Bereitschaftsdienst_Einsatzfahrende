@@ -30,16 +30,54 @@ class ProjectPaths:
         self.cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
         self.raw = os.path.join(self.cd, "../../Sample_Data/Raw/")
 
-class Data(ProjectPaths):
+class DataTransforms:
+
+    def create_demand(self):
+        self.df['demand'] = np.where(self.df['sby_need'] > 0,
+                                     self.df['sby_need'] + self.df['n_duty'] -
+                                     self.df['n_sick'], np.nan)
+    
+    def n_sick_adjusted(self):
+        n_duty_1700 = np.where(self.df['n_duty']==1700, 
+                               self.df['n_sick']*(19/17),
+                               self.df['n_sick'])
+        n_duty_adj = np.where(self.df['n_duty']==1800,
+                              self.df['n_sick']*(19/18),
+                              n_duty_1700)
+        self.df['n_sick_adj'] = np.round(n_duty_adj).astype(int)
+
+class CreateFeatures:
+    
+    def date_features(self, col_name='date'):
+        self.df_features = self.df.copy()
+        
+        c = self.df_features[col_name]
+        self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
+        self.df_features['year'] = c.dt.year # Jahr (4-stellig)
+        self.df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
+        # Wochentag als Zahl (Montag = 0, Sonntag = 6)
+        self.df_features['weekday'] = c.dt.weekday
+        # Kalenderwoche als Zahl (1-52)
+        self.df_features['weekofyear'] = c.dt.isocalendar().week
+        # Tag des Jahres als Zahl (1-365)
+        self.df_features['dayofyear'] = c.dt.dayofyear
+        # Datum des 15. des vorherigen Monats
+        self.df_features['predict_day'] = c - DateOffset(months=1, day=15)
+        # Anzahl der Tage seit dem ersten Tag im Datensatz
+        self.df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
+
+        m = self.df_features['month']
+        self.df_features['season'] = (m-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
+
+
+class Data(ProjectPaths, DataTransforms, CreateFeatures):
     def __init__(self, **kwds):
         super().__init__(**kwds)
         self.df_build_notes = []
 
     def make_df(self):
         filepath = self.raw + 'sickness_table.csv'
-        self.df = pd.read_csv(filepath, 
-                                             index_col=0, 
-                                             parse_dates=['date'])
+        self.df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
         
         note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
@@ -88,13 +126,10 @@ class Data(ProjectPaths):
             note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
 
-    def is_int(self):
+    def is_whole_int(self, int_cols):
 
         # Leere Liste für nicht-ganzzahlige Werte
         non_int_list = []
-
-        # Spalten die ganzzahlig sein müssen
-        int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
 
         # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
         # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
@@ -125,14 +160,14 @@ class Data(ProjectPaths):
             note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
             self.df_build_notes.append(note)
 
-    def missing_dates(self):
+    def missing_dates(self, column_name='date'):
         """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
-        start_date = self.df['date'].min()
-        end_date = self.df['date'].max()
+        start_date = self.df[column_name].min()
+        end_date = self.df[column_name].max()
         date_range = pd.date_range(start=start_date, end=end_date)
         missing_dates = []
         for date in date_range:
-            if date not in self.df['date'].values:
+            if date not in self.df[column_name].values:
                 missing_dates.append(date)
         if len(missing_dates) == 0:
             note = "Erfolgreich: Alle Daten zwischen Start- und Enddatum vorhanden"
@@ -176,42 +211,6 @@ class Data(ProjectPaths):
 
             note = "Erfolgreich: Zusammenfassung des DataFrames als summary_list erstellt"
             self.df_build_notes.append(note)
-
-def sickness_table_df(df):
-#     """
-#     Liest die CSV-Datei ein, überprüft die Datenqualität und 
-#     gibt einen DataFrame zurück
-#     """
-
-    df_build_notes = []
-
-
-    def df_summary(df):
-        """Gibt eine Zusammenfassung des DataFrames aus"""
-        df.describe().to_csv(f'{current_directory}\\df_description.csv', sep=';', decimal=',')
-        summary_list = []
-        summary_list.append("\nDataframe Info:")
-        summary_list.append(df.describe())
-        summary_list.append(df.head())
-        summary_list.append(df.tail())
-
-        return summary_list
-     
-    summary_list = df_summary(df)
-
-    return df, df_build_notes, summary_list
-
-def new_columns(df):
-    df_2 = df.copy() # Kopie des DataFrames erstellen
-    df_2['demand'] = np.where(df_2['sby_need'] > 0, df_2['sby_need'] + 
-                              df_2['n_duty'] - df_2['n_sick'], np.nan)
-    n_duty_1700 = np.where(df_2['n_duty']==1700, df_2['n_sick']*(19/17),
-                           df_2['n_sick'])
-    n_duty_adj = np.where(df_2['n_duty']==1800,df_2['n_sick']*(19/18), 
-                                  n_duty_1700)
-    df_2['n_sick_adj'] = np.round(n_duty_adj).astype(int)
-    
-    return df_2
 
 def new_features(df):
     df_2 = df.copy() # Kopie des DataFrames erstellen
