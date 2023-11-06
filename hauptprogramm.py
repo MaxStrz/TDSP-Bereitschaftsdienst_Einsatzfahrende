@@ -35,6 +35,9 @@ my_data.date_features()
 print(my_data.df)
 df = my_data.df
 
+viz = my_data.viz_konstruktor()
+
+my_data.Viz.demand_vs_calls()
 # stop running program here
 sys.exit()
 

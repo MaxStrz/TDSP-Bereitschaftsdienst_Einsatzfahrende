@@ -50,7 +50,7 @@ class CreateFeatures:
     
     def date_features(self, col_name='date'):
         self.df_features = self.df.copy()
-        
+
         c = self.df_features[col_name]
         self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
         self.df_features['year'] = c.dt.year # Jahr (4-stellig)
@@ -69,6 +69,23 @@ class CreateFeatures:
         m = self.df_features['month']
         self.df_features['season'] = (m-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
 
+class Viz:
+    def __init__(self, df_viz):
+        self.df_viz = df_viz
+        self.date = self.df_viz['date']
+        print(self.date)
+
+    def demand_vs_calls(self):
+        print(self.date)
+    #     # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
+    #     fig, ax = plt.subplots()
+    #     ax.scatter(df['calls'], df['demand'], s=3)
+    #     # Beschriftung der Achsen und Titel
+    #     ax.set_title('Streuungsdiagramm: Notrufe und Gesamtnachfrage')
+    #     ax.set_xlabel('Anzahl der Notrufe')
+    #     ax.set_ylabel('Gesamtnachfrage')
+    #     # Zeige das Diagramm
+    #     plt.savefig(f'{current_directory}\\demand_vs_calls.jpg')
 
 class Data(ProjectPaths, DataTransforms, CreateFeatures):
     def __init__(self, **kwds):
@@ -211,6 +228,9 @@ class Data(ProjectPaths, DataTransforms, CreateFeatures):
 
             note = "Erfolgreich: Zusammenfassung des DataFrames als summary_list erstellt"
             self.df_build_notes.append(note)
+
+    def viz_konstruktor(self):
+        self.Viz = Viz(self.df)
 
 def new_features(df):
     df_2 = df.copy() # Kopie des DataFrames erstellen
