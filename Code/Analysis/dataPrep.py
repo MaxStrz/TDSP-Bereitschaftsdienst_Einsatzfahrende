@@ -18,6 +18,7 @@ from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientB
 import warnings
 from statsmodels.tsa.seasonal import seasonal_decompose
 import skops.io as sio
+import sys
 
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
@@ -25,80 +26,25 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 # absolute dir in dem das Skript ist
 current_directory = os.path.dirname(__file__)
 
-class ProjectPaths:
+class SavedData:
+    cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
+    raw = os.path.join(cd, "../../Sample_Data/Raw/")
+
     def __init__(self, **kwds):
-        self.cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-        self.raw = os.path.join(self.cd, "../../Sample_Data/Raw/")
+        self.path_sickness_table = os.path.join(self.raw, "sickness_table.csv")
 
-class DataTransforms:
-
-    def create_demand(self):
-        self.df['demand'] = np.where(self.df['sby_need'] > 0,
-                                     self.df['sby_need'] + self.df['n_duty'] -
-                                     self.df['n_sick'], np.nan)
-    
-    def n_sick_adjusted(self):
-        n_duty_1700 = np.where(self.df['n_duty']==1700, 
-                               self.df['n_sick']*(19/17),
-                               self.df['n_sick'])
-        n_duty_adj = np.where(self.df['n_duty']==1800,
-                              self.df['n_sick']*(19/18),
-                              n_duty_1700)
-        self.df['n_sick_adj'] = np.round(n_duty_adj).astype(int)
-
-class CreateFeatures:
-    
-    def date_features(self, col_name='date'):
-        self.df_features = self.df.copy()
-
-        c = self.df_features[col_name]
-        self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
-        self.df_features['year'] = c.dt.year # Jahr (4-stellig)
-        self.df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
-        # Wochentag als Zahl (Montag = 0, Sonntag = 6)
-        self.df_features['weekday'] = c.dt.weekday
-        # Kalenderwoche als Zahl (1-52)
-        self.df_features['weekofyear'] = c.dt.isocalendar().week
-        # Tag des Jahres als Zahl (1-365)
-        self.df_features['dayofyear'] = c.dt.dayofyear
-        # Datum des 15. des vorherigen Monats
-        self.df_features['predict_day'] = c - DateOffset(months=1, day=15)
-        # Anzahl der Tage seit dem ersten Tag im Datensatz
-        self.df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
-
-        m = self.df_features['month']
-        self.df_features['season'] = (m-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
-
-class Viz:
-    def __init__(self, df_viz):
-        self.df_viz = df_viz
-        self.date = self.df_viz['date']
-        print(self.date)
-
-    def demand_vs_calls(self):
-        print(self.date)
-    #     # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
-    #     fig, ax = plt.subplots()
-    #     ax.scatter(df['calls'], df['demand'], s=3)
-    #     # Beschriftung der Achsen und Titel
-    #     ax.set_title('Streuungsdiagramm: Notrufe und Gesamtnachfrage')
-    #     ax.set_xlabel('Anzahl der Notrufe')
-    #     ax.set_ylabel('Gesamtnachfrage')
-    #     # Zeige das Diagramm
-    #     plt.savefig(f'{current_directory}\\demand_vs_calls.jpg')
-
-class Data(ProjectPaths, DataTransforms, CreateFeatures):
+class CleanedData(SavedData):
     def __init__(self, **kwds):
         super().__init__(**kwds)
         self.df_build_notes = []
 
     def make_df(self):
-        filepath = self.raw + 'sickness_table.csv'
-        self.df = pd.read_csv(filepath, index_col=0, parse_dates=['date'])
+        self.df = pd.read_csv(self.path_sickness_table, 
+                              index_col=0, parse_dates=['date'])
         
         note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
-    
+
     def missing(self):
         """
         Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
@@ -229,8 +175,70 @@ class Data(ProjectPaths, DataTransforms, CreateFeatures):
             note = "Erfolgreich: Zusammenfassung des DataFrames als summary_list erstellt"
             self.df_build_notes.append(note)
 
-    def viz_konstruktor(self):
-        self.Viz = Viz(self.df)
+class TransformedData(CleanedData):
+
+    def __init__(self, **kwds):
+        super().__init__(**kwds)
+
+    def create_demand(self):
+        self.df['demand'] = np.where(self.df['sby_need'] > 0,
+                                     self.df['sby_need'] + self.df['n_duty'] -
+                                     self.df['n_sick'], np.nan)
+    
+    def n_sick_adjusted(self):
+        n_duty_1700 = np.where(self.df['n_duty']==1700, 
+                               self.df['n_sick']*(19/17),
+                               self.df['n_sick'])
+        n_duty_adj = np.where(self.df['n_duty']==1800,
+                              self.df['n_sick']*(19/18),
+                              n_duty_1700)
+        self.df['n_sick_adj'] = np.round(n_duty_adj).astype(int)
+
+class FeaturedData(TransformedData):
+    def __init__(self, **kwds):
+        super().__init__(**kwds)
+        #self.date_features('date')
+    
+    def date_features(self, col_name='date'):
+        self.df_features = self.df.copy()
+
+        c = self.df_features[col_name]
+        self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
+        self.df_features['year'] = c.dt.year # Jahr (4-stellig)
+        self.df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
+        # Wochentag als Zahl (Montag = 0, Sonntag = 6)
+        self.df_features['weekday'] = c.dt.weekday
+        # Kalenderwoche als Zahl (1-52)
+        self.df_features['weekofyear'] = c.dt.isocalendar().week
+        # Tag des Jahres als Zahl (1-365)
+        self.df_features['dayofyear'] = c.dt.dayofyear
+        # Datum des 15. des vorherigen Monats
+        self.df_features['predict_day'] = c - DateOffset(months=1, day=15)
+        # Anzahl der Tage seit dem ersten Tag im Datensatz
+        self.df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
+
+        m = self.df_features['month']
+        self.df_features['season'] = (m-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
+
+class VizdData():
+    def __init__(self, df_viz):
+        super().__init__(**kwds)
+        self.df_viz = df_viz
+        self.date = self.df_viz['date']
+        print(self.date)
+
+    def demand_vs_calls(self):
+        print(self.date)
+    #     # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
+    #     fig, ax = plt.subplots()
+    #     ax.scatter(df['calls'], df['demand'], s=3)
+    #     # Beschriftung der Achsen und Titel
+    #     ax.set_title('Streuungsdiagramm: Notrufe und Gesamtnachfrage')
+    #     ax.set_xlabel('Anzahl der Notrufe')
+    #     ax.set_ylabel('Gesamtnachfrage')
+    #     # Zeige das Diagramm
+    #     plt.savefig(f'{current_directory}\\demand_vs_calls.jpg')
+
 
 def new_features(df):
     df_2 = df.copy() # Kopie des DataFrames erstellen

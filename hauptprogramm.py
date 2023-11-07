@@ -11,7 +11,7 @@ import Code.Modeling.base_models as base_models
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
 
-my_data = data_prep.Data()
+my_data = data_prep.FeaturedData()
 
 my_data.make_df()
 
@@ -29,7 +29,11 @@ my_data.df_summary()
 for note in my_data.df_build_notes:
     print(note)
 
-my_data.create_demand()
+my_data.date_features()
+print(my_data.df_features)
+# stop running program here
+sys.exit()
+
 my_data.n_sick_adjusted()
 my_data.date_features()
 print(my_data.df)
@@ -38,8 +42,7 @@ df = my_data.df
 viz = my_data.viz_konstruktor()
 
 my_data.Viz.demand_vs_calls()
-# stop running program here
-sys.exit()
+
 
 data_prep.overview_scatter(df)
 
