@@ -1,3 +1,6 @@
+print('Hello World!')
+
+print('Goodbye World!')
 import pandas as pd
 import numpy as np
 import warnings
@@ -11,7 +14,10 @@ import Code.Modeling.base_models as base_models
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
 
-my_data = data_prep.FeaturedData()
+my_data = data_prep.CleanedData()
+
+# stop running program here
+sys.exit()
 
 my_data.make_df()
 
@@ -31,8 +37,6 @@ for note in my_data.df_build_notes:
 
 my_data.date_features()
 print(my_data.df_features)
-# stop running program here
-sys.exit()
 
 my_data.n_sick_adjusted()
 my_data.date_features()

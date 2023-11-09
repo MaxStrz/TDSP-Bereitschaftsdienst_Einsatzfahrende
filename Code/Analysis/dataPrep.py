@@ -26,20 +26,21 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 # absolute dir in dem das Skript ist
 current_directory = os.path.dirname(__file__)
 
-class SavedData:
+class DataPaths:
     cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-    raw = os.path.join(cd, "../../Sample_Data/Raw/")
+    path_to_raw_folder = os.path.join(cd, "../../Sample_Data/Raw/")
 
-    def __init__(self, **kwds):
-        self.path_sickness_table = os.path.join(self.raw, "sickness_table.csv")
+    def __init__(self, file_name, **kwds):
+        self.file_path = os.path.join(self.path_to_raw_folder, file_name)
 
-class CleanedData(SavedData):
+class CleanedData(DataPaths):
     def __init__(self, **kwds):
-        super().__init__(**kwds)
+        super().__init__("sickness_table.csv", **kwds)
+        print(self.file_path)
         self.df_build_notes = []
 
     def make_df(self):
-        self.df = pd.read_csv(self.path_sickness_table, 
+        self.df = pd.read_csv(self.file_path, 
                               index_col=0, parse_dates=['date'])
         
         note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
@@ -197,7 +198,6 @@ class TransformedData(CleanedData):
 class FeaturedData(TransformedData):
     def __init__(self, **kwds):
         super().__init__(**kwds)
-        #self.date_features('date')
     
     def date_features(self, col_name='date'):
         self.df_features = self.df.copy()
