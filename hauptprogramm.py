@@ -1,6 +1,3 @@
-print('Hello World!')
-
-print('Goodbye World!')
 import pandas as pd
 import numpy as np
 import warnings
@@ -21,19 +18,8 @@ column_names_types = {'date': 'datetime64[ns]', 'n_sick': 'int16',
                       }
 kwargs = {'file_name':file_name, 'column_names_types':column_names_types,}
 
-my_raw_data = data_prep.RawDataPath(**kwargs)
-my_clean_data = data_prep.CleanedData(**kwargs)
-my_transformed_data = data_prep.TransformedData(**kwargs)
-my_featured_data = data_prep.FeaturedData(**kwargs)
-
-for note in my_featured_data.df_build_notes:
-    print(note)
-
-my_featured_data.date_features()
-
-my_featured_data.n_sick_adjusted()
-my_featured_data.date_features()
-
+reg_class = data_prep.RegCallsDemand(**kwargs)
+reg_class.fit_calls_demand()
 # stop running program here
 sys.exit()
 
