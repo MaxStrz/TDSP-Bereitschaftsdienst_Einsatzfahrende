@@ -214,6 +214,11 @@ class TransformedData(CleanedData):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.clean_data()
+        self.startdate = np.datetime64('2016-04-01')
+        day = np.array((self.df['date']-self.startdate).dt.days + 1)
+        self.arr_day = day.reshape(-1, 1)
+        self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
+
     
     def transform_data(self):
         print("Daten werden transformiert...")
@@ -241,9 +246,7 @@ class TransformedData(CleanedData):
 class FeaturedData(TransformedData):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        print("Daten werden transformiert...")
-        super().create_demand()
-        super().n_sick_adjusted()
+        self.transform_data()
     
     def date_features(self, col_name='date'):
         self.df_features = self.df.copy()
@@ -341,66 +344,47 @@ class RegressionCallsDemand(TransformedData):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.transform_data()
-        self.df_reg = self.df[['calls', 'demand']].query('demand > 0')
-        self.arr_calls = np.array(self.df_reg['calls']).reshape(-1, 1)
-        self.x = np.array(self.df_reg['calls']).reshape(-1, 1)
-        self.y = np.array(self.df_reg['demand']).reshape(-1, 1)
+        sby_needed = self.df[['calls', 'demand']].query('demand > 0')
+        self.arr_reg_calls = np.array(self.sby_needed['calls']).reshape(-1, 1)
+        self.arr_reg_demand = np.array(self.sby_needed['demand']).reshape(-1, 1)
 
     def fit_calls_demand(self):
-        self.ftd_reg_calls_demand = LinearRegression().fit(self.x, self.y)
-        self.reg_calls_demand_scr = self.ftd_reg_calls_demand.score(self.x, 
-                                                                    self.y)
+        self.ftd_reg_calls_demand = LinearRegression().fit(self.arr_reg_calls, self.arr_reg_demand)
+        self.scr_reg_calls_demand = self.ftd_reg_calls_demand.score(self.arr_reg_calls, self.arr_reg_demand)
 
         file = 'model_linear_reg_demand.skops'
         sio.dump(self.ftd_reg_calls_demand, f'{self.cd}\\{file}')
     
     def pred_calls_demand(self):
-        pred_demand = self.ftd_reg_calls_demand.predict(self.arr_calls)
+        pred_demand = self.ftd_reg_calls_demand.predict(self.arr_reg_calls)
         self.pred_demand = np.round(pred_demand, 0).astype(int)
 
-    calls_series = df['calls']
-    calls_series.index = df['date']
-    result = seasonal_decompose(calls_series, model='additive', period=60)
-    result.plot()
-    #plt.show()
+class DataPrediction(FeaturedData):
 
-def notruf_reg(df):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)      
 
-    startdate = np.datetime64('2016-04-01')
-    x = np.array((df['date']-startdate).dt.days + 1)
-    x = x.reshape(-1, 1)
-    y = np.array(df['calls']).reshape(-1, 1)
+    def fit_trend(self):
+        self.trend_reg = LinearRegression().fit(self.arr_day, self.arr_calls)
+        self.trend_score = self.trend_reg.score(self.arr_day, self.arr_calls)
 
-    reg = LinearRegression().fit(x, y)
-    # Persist das Modell mit skops
-    sio.dump(reg, f'{current_directory}\\..\\Modeling\\model_linear_reg.scops')
+        file = 'model_linear_reg_trend.skops'
+        sio.dump(self.trend_reg, f'{self.cd}\\{file}')
+    
+    def pred_trend(self):
+        pred_calls = self.trend_reg.predict(self.arr_day)
+        self.df['calls_reg_pred'] = np.round(pred_calls, 0).astype(int).reshape(-1)
+    
+    def detrend(self):
+        self.df['calls_reg_act_diff'] = self.df['calls'] - self.df['calls_reg_pred']
 
-    reg_score = reg.score(x, y)
-
-    calls_pred = reg.predict(x)
-    calls_pred = (np.round(calls_pred, 0)).astype(int)
-
-    # make calls_pred a numpy array with one dimension
-    calls_pred = calls_pred.reshape(-1)
-
-    # make df['calls'] a numpy array
-    calls = df['calls'].to_numpy()
-
-    # subract calls_pred from calls
-    calls_diff = calls - calls_pred
-
-    df['calls_reg_pred'] = calls_pred
-
-    df['calls_reg_act_diff'] = calls_diff
-
-    # Streuungsdiagramm mit 'date' auf der x-Achse
-    # und 'calls' als Punkte und 'calls_pred' als Linie
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(df['date'], y, s=3)
-    ax.plot(df['date'], df['calls_reg_pred'], color='red')
-    plt.savefig(f'{current_directory}\\notruf_reg.jpg')
-
-    return df, ax, reg, reg_score
+    def my_plot(self):
+        # Streuungsdiagramm mit 'date' auf der x-Achse
+        # und 'calls' als Punkte und 'calls_pred' als Linie
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.scatter(self.df['date'], self.df['calls'], s=3)
+        ax.plot(self.df['date'], self.df['calls_reg_pred'], color='red')
+        plt.savefig(f'{self.cd}\\notruf_reg.jpg')
 
 def no_trend_scatter(df):
     # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
@@ -883,3 +867,8 @@ def get_train_test_fm(feature_matrix):
     return train_test
 
 def seas_decomp(df):
+    calls_series = df['calls']
+    calls_series.index = df['date']
+    result = seasonal_decompose(calls_series, model='additive', period=60)
+    result.plot()
+    #plt.show()

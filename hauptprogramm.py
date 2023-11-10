@@ -22,6 +22,12 @@ reg_class = data_prep.RegressionCallsDemand(**kwargs)
 reg_class.fit_calls_demand()
 reg_class.pred_calls_demand()
 
+trend = data_prep.DataPrediction(**kwargs)
+trend.fit_trend()
+trend.pred_trend()
+trend.detrend()
+trend.my_plot()
+
 # stop running program here
 sys.exit()
 
