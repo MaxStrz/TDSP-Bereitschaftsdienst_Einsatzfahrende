@@ -18,8 +18,10 @@ column_names_types = {'date': 'datetime64[ns]', 'n_sick': 'int16',
                       }
 kwargs = {'file_name':file_name, 'column_names_types':column_names_types,}
 
-reg_class = data_prep.RegCallsDemand(**kwargs)
+reg_class = data_prep.RegressionCallsDemand(**kwargs)
 reg_class.fit_calls_demand()
+reg_class.pred_calls_demand()
+
 # stop running program here
 sys.exit()
 

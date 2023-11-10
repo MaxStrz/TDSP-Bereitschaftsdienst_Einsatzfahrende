@@ -336,12 +336,13 @@ class VizdData(TransformedData):
         to_save_fig = f'{self.cd}\\overview_scatter.jpg'
         plt.savefig(to_save_fig)
 
-class RegCallsDemand(TransformedData):
+class RegressionCallsDemand(TransformedData):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.transform_data()
         self.df_reg = self.df[['calls', 'demand']].query('demand > 0')
+        self.arr_calls = np.array(self.df_reg['calls']).reshape(-1, 1)
         self.x = np.array(self.df_reg['calls']).reshape(-1, 1)
         self.y = np.array(self.df_reg['demand']).reshape(-1, 1)
 
@@ -352,27 +353,11 @@ class RegCallsDemand(TransformedData):
 
         file = 'model_linear_reg_demand.skops'
         sio.dump(self.ftd_reg_calls_demand, f'{self.cd}\\{file}')
+    
+    def pred_calls_demand(self):
+        pred_demand = self.ftd_reg_calls_demand.predict(self.arr_calls)
+        self.pred_demand = np.round(pred_demand, 0).astype(int)
 
-def notrufe_demand_reg(df_dem_pred):
-
-    # Keep df-Spalten 'calls' and 'demand' where 'demand' is not NaN.
-    df_reg = df_dem_pred[['calls', 'demand']].query('demand > 0')
-    x = np.array(df_reg['calls'])
-    x = x.reshape(-1, 1) # x muss 2D sein weil LinearRegression.fit() 2D-Array erwartet
-    y = np.array(df_reg['demand']).reshape(-1, 1)
-
-    reg = LinearRegression().fit(x, y)
-    # Persist das Modell mit skops
-    sio.dump(reg, f'{current_directory}\\model_linear_reg_demand.skops')
-    reg_score = reg.score(x, y)
-
-    demand_pred = reg.predict(np.array(df_dem_pred['calls']).reshape(-1, 1))
-    demand_pred = (np.round(demand_pred, 0)).astype(int)
-    df_dem_pred['demand_pred'] = demand_pred
-
-    return reg, reg_score, df_dem_pred
-
-def seas_decomp(df):
     calls_series = df['calls']
     calls_series.index = df['date']
     result = seasonal_decompose(calls_series, model='additive', period=60)
@@ -896,3 +881,5 @@ def get_train_test_fm(feature_matrix):
         df_to_csv(df, name)
         
     return train_test
+
+def seas_decomp(df):
