@@ -14,34 +14,30 @@ import Code.Modeling.base_models as base_models
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
 
-my_data = data_prep.CleanedData()
+file_name = 'sickness_table.csv'
+column_names_types = {'date': 'datetime64[ns]', 'n_sick': 'int16', 
+                      'calls': 'int32', 'n_duty': 'int16', 
+                      'n_sby': 'int16', 'sby_need': 'int16', 'dafted': 'int16',
+                      }
+kwargs = {'file_name':file_name, 'column_names_types':column_names_types,}
+
+my_raw_data = data_prep.RawDataPath(**kwargs)
+my_clean_data = data_prep.CleanedData(**kwargs)
+my_transformed_data = data_prep.TransformedData(**kwargs)
+my_featured_data = data_prep.FeaturedData(**kwargs)
+
+for note in my_featured_data.df_build_notes:
+    print(note)
+
+my_featured_data.date_features()
+
+my_featured_data.n_sick_adjusted()
+my_featured_data.date_features()
 
 # stop running program here
 sys.exit()
 
-my_data.make_df()
-
-my_data.missing()
-
-int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
-my_data.is_whole_int(int_cols)
-
-my_data.missing_dates()
-
-my_data.set_data_types()
-
-my_data.df_summary()
-
-for note in my_data.df_build_notes:
-    print(note)
-
-my_data.date_features()
-print(my_data.df_features)
-
-my_data.n_sick_adjusted()
-my_data.date_features()
-print(my_data.df)
-df = my_data.df
+df = my_featured_data.df
 
 viz = my_data.viz_konstruktor()
 

@@ -26,23 +26,34 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 # absolute dir in dem das Skript ist
 current_directory = os.path.dirname(__file__)
 
-class DataPaths:
+class KwargsNotUsed:
+    def __init__(self, **kwargs):
+        self.not_used_kwargs = kwargs
+
+class RawDataPath(KwargsNotUsed):
     cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
     path_to_raw_folder = os.path.join(cd, "../../Sample_Data/Raw/")
 
-    def __init__(self, file_name, **kwds):
+    def __init__(self, file_name, **kwargs):
         self.file_path = os.path.join(self.path_to_raw_folder, file_name)
+        super().__init__(**kwargs)
 
-class CleanedData(DataPaths):
-    def __init__(self, **kwds):
-        super().__init__("sickness_table.csv", **kwds)
-        print(self.file_path)
+class CleanedData(RawDataPath):
+    def __init__(self, column_names_types, **kwargs):
+        super().__init__(**kwargs)
         self.df_build_notes = []
+        self.column_names_types = column_names_types
+        self.column_names = column_names_types.keys()
+        self.column_types = column_names_types.values()
 
     def make_df(self):
         self.df = pd.read_csv(self.file_path, 
                               index_col=0, parse_dates=['date'])
         
+        # ueberpruefe ob die Liste der Spaltennamen richtig ist
+        enote = "Spaltennamen sind nicht korrekt" 
+        assert list(self.df.columns).sort() == list(self.column_names).sort(), enote
+            
         note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
 
@@ -83,17 +94,21 @@ class CleanedData(DataPaths):
                     else:
                         continue
             # Drücke die nicht vollständige Liste df_build_notes aus
-            [print(notes) for notes in df_build_notes]
+            [print(notes) for notes in self.df_build_notes]
         
             raise ValueError("Fehlende Daten in der CSV-Datei")
         else:
             note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
 
-    def is_whole_int(self, int_cols):
+    def is_whole_int(self):
 
         # Leere Liste für nicht-ganzzahlige Werte
         non_int_list = []
+
+        # Liste alle integar-Spalten
+        types = self.column_names_types.items()
+        int_cols = [c for c, v in types if v=='int16' or v=='int32' or v=='int64']
 
         # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
         # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
@@ -178,8 +193,14 @@ class CleanedData(DataPaths):
 
 class TransformedData(CleanedData):
 
-    def __init__(self, **kwds):
-        super().__init__(**kwds)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        super().make_df()
+        super().missing()
+        super().is_whole_int()
+        super().missing_dates()
+        super().set_data_types()
+        super().df_summary()
 
     def create_demand(self):
         self.df['demand'] = np.where(self.df['sby_need'] > 0,
@@ -196,12 +217,13 @@ class TransformedData(CleanedData):
         self.df['n_sick_adj'] = np.round(n_duty_adj).astype(int)
 
 class FeaturedData(TransformedData):
-    def __init__(self, **kwds):
-        super().__init__(**kwds)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        super().create_demand()
+        super().n_sick_adjusted()
     
     def date_features(self, col_name='date'):
         self.df_features = self.df.copy()
-
         c = self.df_features[col_name]
         self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
         self.df_features['year'] = c.dt.year # Jahr (4-stellig)
@@ -218,27 +240,38 @@ class FeaturedData(TransformedData):
         self.df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
 
         m = self.df_features['month']
-        self.df_features['season'] = (m-1) % 12 // 3 + 1 # Jahreszeit als Zahl (1-4) (1 = Winter, 2 = Frühling, 3 = Sommer, 4 = Herbst)
+        # Jahreszeit als Zahl (1-4) (1=Winter, 2=Frühling, 3=Sommer, 4=Herbst)
+        self.df_features['season'] = (m-1) % 12 // 3 + 1
 
-class VizdData():
-    def __init__(self, df_viz):
-        super().__init__(**kwds)
-        self.df_viz = df_viz
-        self.date = self.df_viz['date']
-        print(self.date)
+        if 'calls' in self.df_features:
+            self.df_features['status'] = 'actual'
+
+        else:
+            self.df_features['status'] = 'prediction'
+
+class VizdData(TransformedData):
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.date = self.df['date']
+        self.calls = self.df['calls']
+        self.demand = self.df['demand']
+        self.n_sick_adj = self.df['n_sick_adj']
+        self.sby_need = self.df['sby_need']
+        self.n_duty = self.df['n_duty']
+        self.dafted = self.df['dafted']
+        self.n_sby = self.df['n_sby']
 
     def demand_vs_calls(self):
-        print(self.date)
-    #     # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
-    #     fig, ax = plt.subplots()
-    #     ax.scatter(df['calls'], df['demand'], s=3)
-    #     # Beschriftung der Achsen und Titel
-    #     ax.set_title('Streuungsdiagramm: Notrufe und Gesamtnachfrage')
-    #     ax.set_xlabel('Anzahl der Notrufe')
-    #     ax.set_ylabel('Gesamtnachfrage')
-    #     # Zeige das Diagramm
-    #     plt.savefig(f'{current_directory}\\demand_vs_calls.jpg')
-
+        # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
+        fig, ax = plt.subplots()
+        ax.scatter(self.calls, self.demand, s=3)
+        # Beschriftung der Achsen und Titel
+        ax.set_title('Streuungsdiagramm: Notrufe und Gesamtnachfrage')
+        ax.set_xlabel('Anzahl der Notrufe')
+        ax.set_ylabel('Gesamtnachfrage')
+        # Zeige das Diagramm
+        plt.savefig(f'{self.cd}\\demand_vs_calls.jpg')
 
 def new_features(df):
     df_2 = df.copy() # Kopie des DataFrames erstellen
