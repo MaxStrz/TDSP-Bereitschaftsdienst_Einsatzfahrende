@@ -11,12 +11,13 @@ import Code.Modeling.base_models as base_models
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
 
-file_name = 'sickness_table.csv'
+my_file_name = 'sickness_table.csv'
 column_names_types = {'date': 'datetime64[ns]', 'n_sick': 'int16', 
                       'calls': 'int32', 'n_duty': 'int16', 
                       'n_sby': 'int16', 'sby_need': 'int16', 'dafted': 'int16',
                       }
-kwargs = {'file_name':file_name, 'column_names_types':column_names_types,}
+kwargs = {'my_file_name':my_file_name, 
+          'column_names_types':column_names_types,}
 
 reg_class = data_prep.RegressionCallsDemand(**kwargs)
 reg_class.fit_calls_demand()
@@ -27,6 +28,10 @@ trend.fit_trend()
 trend.pred_trend()
 trend.detrend()
 trend.my_plot()
+
+ins = data_prep.NewCleanedData.my_data_from_csv('sickness_table.csv', 
+                                        column_names_types)
+print(ins.cleaning_notes)
 
 # stop running program here
 sys.exit()

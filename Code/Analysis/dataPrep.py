@@ -1,11 +1,13 @@
-import pandas as pd
-import numpy as np  
-import os
-from pandas.tseries.offsets import DateOffset
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+from __future__ import annotations
 import featuretools as ft
 from featuretools.primitives import Lag, RollingMin, RollingMean
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np  
+import os
+import pandas as pd
+from pandas.tseries.offsets import DateOffset
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import GridSearchCV
@@ -14,11 +16,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
-import warnings
-from statsmodels.tsa.seasonal import seasonal_decompose
 import skops.io as sio
+from statsmodels.tsa.seasonal import seasonal_decompose
 import sys
+import warnings
 
 # ignoriere FutureWarnings
 warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
@@ -27,27 +28,177 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 current_directory = os.path.dirname(__file__)
 
 class KwargsNotUsed:
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         self.not_used_kwargs = kwargs
 
 class RawDataPath(KwargsNotUsed):
-    cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-    path_to_raw_folder = os.path.join(cd, "../../Sample_Data/Raw/")
+    cd: str = os.path.dirname(__file__) # absolute dir in dem das Skript ist
+    path_to_raw_folder: str = os.path.join(cd, "../../Sample_Data/Raw/")
 
-    def __init__(self, file_name, **kwargs):
+    def __init__(self, my_file_name: str, **kwargs) -> None:
         print("Datapfad wird erstellt...")
-        self.file_path = os.path.join(self.path_to_raw_folder, file_name)
+        self.file_path = os.path.join(self.path_to_raw_folder, my_file_name)
         super().__init__(**kwargs)
 
+class NewCleanedData:
+
+    def __init__(self, df: pd.DataFrame, cleaning_notes: list[str]) -> None:
+        self.df = df
+        self.cleaning_notes = cleaning_notes
+    
+    @classmethod
+    def my_data_from_csv(cls, 
+                         raw_file_name: str, 
+                         column_names_types: dict[str, str]
+                         ) -> MyData:
+        my_file_path = RawDataPath(raw_file_name).file_path
+        df = pd.read_csv(my_file_path, index_col=0, parse_dates=['date'])
+        cleaning_notes = cls._quality_checks(df, column_names_types)
+        df = df.astype(column_names_types)
+        return cls(df, cleaning_notes)
+
+    @classmethod
+    def _quality_checks(cls, 
+                        df: pd.DataFrame, 
+                        column_names_types: dict[str, str]
+                        ) -> list[str]:
+        
+        note_missing = cls._missing(df)
+        note_is_whole_int = cls._is_whole_int(df, column_names_types)
+        note_missing_dates = cls._missing_dates(df, column_name='date')
+        note_n_sby_values = cls._check_n_sby_values(df)
+        note_n_duty_values = cls._check_n_duty_values(df)
+        
+        cleaning_notes = [note_missing, note_is_whole_int, 
+                          note_missing_dates, note_n_sby_values,
+                          note_n_duty_values]
+
+        return cleaning_notes
+
+    @staticmethod
+    def _missing(df) -> str:
+        """
+        Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
+        gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
+        Liste von fehlenden Daten aus.
+
+        Args:
+            df (pandas.DataFrame): Der DataFrame, der überprüft 
+            werden soll.
+
+        Raises:
+            ValueError: Wenn es fehlende Daten in der CSV-Datei gibt.
+
+        Returns:
+            None
+        """
+        # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
+        # pd.Series mit Spalten als Index und Wert True wenn es 
+        # fehlende Daten gibt, sonst False
+        df_missing = df.isnull().any()
+        if df_missing.any():
+            # for-Schleife um die fehlenden Daten in der jeweiligen 
+            # Spalte zu finden
+            for col in df_missing.index:
+                # enumerate() gibt den Index und Wert jedes Elements 
+                # in der Spalte aus
+                for index, value in enumerate(df[col]):
+                    if pd.isna(value):
+                        # Füge die Spalte, das Datum und den Index des 
+                        # fehlenden Wertes in die Liste ein
+                        note = (f"Nicht erfolgreich:\n"
+                                f"Es fehlen Daten in Spalte: "
+                                f"{col}, Index: {index}")
+                    else:
+                        continue
+            raise ValueError("Fehlende Daten in der CSV-Datei")
+        else:
+            note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
+        
+        return note
+
+    @staticmethod
+    def _is_whole_int(df, column_names_types) -> str:
+
+        # Leere Liste für nicht-ganzzahlige Werte
+        non_int_list = []
+
+        # Liste alle integar-Spalten
+        t = column_names_types.items()
+        int_cols = [c for c, v in t if v=='int16' or v=='int32' or v=='int64']
+
+        # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
+        # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
+        # Interger-Wert sind. Wenn nicht, raise error und gebe das Datum
+        #  aus der 'date'-Spalte und Index des fehlerhaften Wertes aus.
+        for col in int_cols:
+            for index, value in enumerate(df[col]):
+                # Drücke ganze Zeile von index aus
+                if value != int(value):
+                    # Füge die Spalte, das Datum und den Index des 
+                    # fehlenden Wertes in die Liste ein
+                    non_int_list.append([col, df.loc[index]])
+                else:
+                    continue
+        
+        # Wenn die Liste nicht leer ist, beschreibe die 
+        # fehlerhaften Daten und raise error
+        if len(non_int_list) != 0:
+            print(f"Es gibt {len(non_int_list)} nicht-ganzzahlige "
+                    f"Werte im Datensatz:")
+            for data in non_int_list:
+                print(f"Spalte: {data[0]}, Zeile: {data[1]}")
+
+            note = f"Nicht-ganzzahlige Werte in den Spalten {int_cols}"
+            raise ValueError(note)
+        else:
+            cols = ", ".join([str(col) for col in int_cols])
+            note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
+        
+        return note
+
+    @staticmethod
+    def _missing_dates(df, column_name: str='date') -> str:
+        """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
+        start_date = df[column_name].min()
+        end_date = df[column_name].max()
+        date_range = pd.date_range(start=start_date, end=end_date)
+        missing_dates = []
+        for date in date_range:
+            if date not in df[column_name].values:
+                missing_dates.append(date)
+        if len(missing_dates) == 0:
+            note = "Erfolgreich: Alle Daten zwischen Start- und Enddatum vorhanden"
+        else:
+            print(f"Es fehlen {len(missing_dates)} "
+                  f"Daten zwischen Start- und Enddatum")
+            print(f"Die fehlenden Daten sind: {missing_dates}")
+            raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
+        
+        return note
+
+    @staticmethod
+    def _check_n_sby_values(df) -> str:
+        n_sby = df['n_sby'].unique()
+        return f"Werte in der n_sby-Spalte:{n_sby}"
+
+    @staticmethod
+    def _check_n_duty_values(df) -> str:
+        n_duty = df['n_duty'].unique()
+        return f"Werte in der n_duty-Spalte:{n_duty}"
+
 class CleanedData(RawDataPath):
-    def __init__(self, column_names_types, **kwargs):
+    def __init__(self, 
+                 column_names_types: dict[str, str], 
+                 **kwargs
+                 ) -> None:
         super().__init__(**kwargs)
         self.df_build_notes = []
         self.column_names_types = column_names_types
         self.column_names = column_names_types.keys()
         self.column_types = column_names_types.values()
     
-    def clean_data(self):
+    def clean_data(self) -> None:
         print("Daten werden bereinigt...")
         self.make_df()
         self.missing()
@@ -57,7 +208,7 @@ class CleanedData(RawDataPath):
         self.check_sby_duty_values()
         self.df_summary()
 
-    def make_df(self):
+    def make_df(self) -> None:
         self.df = pd.read_csv(self.file_path, 
                               index_col=0, parse_dates=['date'])
         
@@ -68,7 +219,7 @@ class CleanedData(RawDataPath):
         note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
         self.df_build_notes.append(note)
 
-    def missing(self):
+    def missing(self) -> None:
         """
         Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
         gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
@@ -112,7 +263,7 @@ class CleanedData(RawDataPath):
             note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
 
-    def is_whole_int(self):
+    def is_whole_int(self) -> None:
 
         # Leere Liste für nicht-ganzzahlige Werte
         non_int_list = []
@@ -150,7 +301,7 @@ class CleanedData(RawDataPath):
             note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
             self.df_build_notes.append(note)
 
-    def missing_dates(self, column_name='date'):
+    def missing_dates(self, column_name: str='date') -> None:
         """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
         start_date = self.df[column_name].min()
         end_date = self.df[column_name].max()
@@ -168,7 +319,7 @@ class CleanedData(RawDataPath):
             print(f"Die fehlenden Daten sind: {missing_dates}")
             raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
 
-    def set_data_types(self):
+    def set_data_types(self) -> None:
         # Alle Spalten außer 'date' in Integer umwandeln
         int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
         for col in int_cols:
@@ -186,14 +337,14 @@ class CleanedData(RawDataPath):
         note = "Erfolgreich: Alle Daten in der 'date'-Spalte sind Datetime-Datentyp"
         self.df_build_notes.append(note)
         
-    def check_sby_duty_values(self):
+    def check_sby_duty_values(self) -> None:
         n_sby = self.df['n_sby'].unique()
         self.df_build_notes.append(f"Werte in der n_sby-Spalte:{n_sby}")
 
         n_duty = self.df['n_duty'].unique()
         self.df_build_notes.append(f"Werte in der n_duty-Spalte:{n_duty}")
 
-    def df_summary(self):
+    def df_summary(self) -> None:
             """Gibt eine Zusammenfassung des DataFrames aus"""
 
             self.df.describe().to_csv(f"{self.cd}\\df_description.csv",
@@ -211,28 +362,27 @@ class CleanedData(RawDataPath):
 
 class TransformedData(CleanedData):
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.clean_data()
         self.startdate = np.datetime64('2016-04-01')
         day = np.array((self.df['date']-self.startdate).dt.days + 1)
         self.arr_day = day.reshape(-1, 1)
         self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
-
     
-    def transform_data(self):
+    def transform_data(self) -> None:
         print("Daten werden transformiert...")
         self.create_demand()
         self.n_sick_adjusted()
 
-    def create_demand(self):
+    def create_demand(self) -> None:
         self.df['demand'] = np.where(self.df['sby_need'] > 0,
                                      self.df['sby_need'] + self.df['n_duty'] -
                                      self.df['n_sick'], np.nan)
         note = "Erfolgreich: Spalte 'demand' erstellt"
         self.df_build_notes.append(note)
     
-    def n_sick_adjusted(self):
+    def n_sick_adjusted(self) -> None:
         n_duty_1700 = np.where(self.df['n_duty']==1700, 
                                self.df['n_sick']*(19/17),
                                self.df['n_sick'])
@@ -244,13 +394,13 @@ class TransformedData(CleanedData):
         self.df_build_notes.append(note)
 
 class FeaturedData(TransformedData):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.transform_data()
     
-    def date_features(self, col_name='date'):
+    def date_features(self, column_name='date') -> None:
         self.df_features = self.df.copy()
-        c = self.df_features[col_name]
+        c = self.df_features[column_name]
         self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
         self.df_features['year'] = c.dt.year # Jahr (4-stellig)
         self.df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
@@ -277,11 +427,11 @@ class FeaturedData(TransformedData):
 
 class VizdData(TransformedData):
     
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.transform_data()
 
-    def demand_vs_calls(self):
+    def demand_vs_calls(self) -> None:
         # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
         fig, ax = plt.subplots()
         ax.scatter(self.df['calls'], self.df['demand'], s=3)
@@ -292,7 +442,7 @@ class VizdData(TransformedData):
         # Zeige das Diagramm
         plt.savefig(f'{self.cd}\\demand_vs_calls.jpg')
 
-    def overview_scatter(self):
+    def overview_scatter(self) -> None:
 
         # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
         fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, sharex=True, figsize=(10, 10))
@@ -341,44 +491,44 @@ class VizdData(TransformedData):
 
 class RegressionCallsDemand(TransformedData):
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.transform_data()
         sby_needed = self.df[['calls', 'demand']].query('demand > 0')
-        self.arr_reg_calls = np.array(self.sby_needed['calls']).reshape(-1, 1)
-        self.arr_reg_demand = np.array(self.sby_needed['demand']).reshape(-1, 1)
+        self.arr_reg_calls = np.array(sby_needed['calls']).reshape(-1, 1)
+        self.arr_reg_demand = np.array(sby_needed['demand']).reshape(-1, 1)
 
-    def fit_calls_demand(self):
+    def fit_calls_demand(self) -> None:
         self.ftd_reg_calls_demand = LinearRegression().fit(self.arr_reg_calls, self.arr_reg_demand)
         self.scr_reg_calls_demand = self.ftd_reg_calls_demand.score(self.arr_reg_calls, self.arr_reg_demand)
 
         file = 'model_linear_reg_demand.skops'
         sio.dump(self.ftd_reg_calls_demand, f'{self.cd}\\{file}')
     
-    def pred_calls_demand(self):
+    def pred_calls_demand(self) -> None:
         pred_demand = self.ftd_reg_calls_demand.predict(self.arr_reg_calls)
         self.pred_demand = np.round(pred_demand, 0).astype(int)
 
 class DataPrediction(FeaturedData):
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)      
 
-    def fit_trend(self):
+    def fit_trend(self) -> None:
         self.trend_reg = LinearRegression().fit(self.arr_day, self.arr_calls)
         self.trend_score = self.trend_reg.score(self.arr_day, self.arr_calls)
 
         file = 'model_linear_reg_trend.skops'
         sio.dump(self.trend_reg, f'{self.cd}\\{file}')
     
-    def pred_trend(self):
+    def pred_trend(self) -> None:
         pred_calls = self.trend_reg.predict(self.arr_day)
         self.df['calls_reg_pred'] = np.round(pred_calls, 0).astype(int).reshape(-1)
     
-    def detrend(self):
+    def detrend(self) -> None:
         self.df['calls_reg_act_diff'] = self.df['calls'] - self.df['calls_reg_pred']
 
-    def my_plot(self):
+    def my_plot(self) -> None:
         # Streuungsdiagramm mit 'date' auf der x-Achse
         # und 'calls' als Punkte und 'calls_pred' als Linie
         fig, ax = plt.subplots(figsize=(10, 5))
