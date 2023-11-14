@@ -29,9 +29,12 @@ trend.pred_trend()
 trend.detrend()
 trend.my_plot()
 
-ins = data_prep.NewCleanedData.my_data_from_csv('sickness_table.csv', 
-                                        column_names_types)
-print(ins.cleaning_notes)
+cleaned_data = data_prep.NewCleanedData.my_data_from_csv('sickness_table.csv', 
+                                                column_names_types)
+
+transformed_data = data_prep.NewTransformedData(cleaned_data.df)
+
+print(transformed_data.df_transformed.head())
 
 # stop running program here
 sys.exit()

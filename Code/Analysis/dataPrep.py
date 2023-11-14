@@ -26,12 +26,15 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 
 # absolute dir in dem das Skript ist
 current_directory = os.path.dirname(__file__)
+cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
+relative_path_to_raw_folder = "../../Sample_Data/Raw/"
+path_to_raw_folder = os.path.join(cd, relative_path_to_raw_folder)
 
 class KwargsNotUsed:
     def __init__(self, **kwargs) -> None:
         self.not_used_kwargs = kwargs
 
-class RawDataPath(KwargsNotUsed):
+class RawDataPath():
     cd: str = os.path.dirname(__file__) # absolute dir in dem das Skript ist
     path_to_raw_folder: str = os.path.join(cd, "../../Sample_Data/Raw/")
 
@@ -51,8 +54,9 @@ class NewCleanedData:
                          raw_file_name: str, 
                          column_names_types: dict[str, str]
                          ) -> MyData:
-        my_file_path = RawDataPath(raw_file_name).file_path
-        df = pd.read_csv(my_file_path, index_col=0, parse_dates=['date'])
+        
+        my_raw_file_path = RawDataPath(raw_file_name).file_path
+        df = pd.read_csv(my_raw_file_path, index_col=0, parse_dates=['date'])
         cleaning_notes = cls._quality_checks(df, column_names_types)
         df = df.astype(column_names_types)
         return cls(df, cleaning_notes)
@@ -186,6 +190,48 @@ class NewCleanedData:
     def _check_n_duty_values(df) -> str:
         n_duty = df['n_duty'].unique()
         return f"Werte in der n_duty-Spalte:{n_duty}"
+
+class NewTransformedData:
+    startdate = np.datetime64('2016-04-01')
+
+    def __init__(self, 
+                 df_cleaned: pd.DataFrame
+                 ) -> None:
+        
+        self._df_cleaned = df_cleaned
+        self.df_transformed = self._transform_cleaned_df()
+
+    def _transform_cleaned_df(self) -> pd.DataFrame:
+        s_demand = self.create_demand()
+        s_n_sick_adj = self.n_sick_adjusted()
+        df_transformed = self._df_cleaned.assign(demand=s_demand, 
+                                                 n_sick_adj=s_n_sick_adj)
+        return df_transformed
+
+    def create_demand(self) -> pd.Series:
+        df = self._df_cleaned # Alias für _df_cleaned
+        s_demand = np.where(df['sby_need'] > 0,
+                            df['sby_need'] + df['n_duty'] -
+                            df['n_sick'], np.nan)
+        return s_demand
+        
+    def n_sick_adjusted(self) -> pd.Series:
+        df = self._df_cleaned # Alias für _df_cleaned
+        n_duty_1700 = np.where(df['n_duty']==1700, 
+                               df['n_sick']*(19/17),
+                               df['n_sick'])
+        n_duty_adj = np.where(df['n_duty']==1800,
+                              df['n_sick']*(19/18),
+                              n_duty_1700)
+        s_n_sick_adj = np.round(n_duty_adj).astype(int)
+        return s_n_sick_adj
+
+    # day = np.array((self.df['date']-self.startdate).dt.days + 1)
+    # self.arr_day = day.reshape(-1, 1)
+    # self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
+
+
+
 
 class CleanedData(RawDataPath):
     def __init__(self, 
