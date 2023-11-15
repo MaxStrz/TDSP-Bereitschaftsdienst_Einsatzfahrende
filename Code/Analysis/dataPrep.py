@@ -35,12 +35,10 @@ class KwargsNotUsed:
         self.not_used_kwargs = kwargs
 
 class RawDataPath():
-    cd: str = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-    path_to_raw_folder: str = os.path.join(cd, "../../Sample_Data/Raw/")
 
     def __init__(self, my_file_name: str, **kwargs) -> None:
         print("Datapfad wird erstellt...")
-        self.file_path = os.path.join(self.path_to_raw_folder, my_file_name)
+        self.file_path = os.path.join(path_to_raw_folder, my_file_name)
         super().__init__(**kwargs)
 
 class NewCleanedData:
@@ -194,9 +192,7 @@ class NewCleanedData:
 class NewTransformedData:
     startdate = np.datetime64('2016-04-01')
 
-    def __init__(self, 
-                 df_cleaned: pd.DataFrame
-                 ) -> None:
+    def __init__(self, df_cleaned: pd.DataFrame) -> None:
         
         self._df_cleaned = df_cleaned
         self.df_transformed = self._transform_cleaned_df()
@@ -229,9 +225,6 @@ class NewTransformedData:
     # day = np.array((self.df['date']-self.startdate).dt.days + 1)
     # self.arr_day = day.reshape(-1, 1)
     # self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
-
-
-
 
 class CleanedData(RawDataPath):
     def __init__(self, 
@@ -393,7 +386,7 @@ class CleanedData(RawDataPath):
     def df_summary(self) -> None:
             """Gibt eine Zusammenfassung des DataFrames aus"""
 
-            self.df.describe().to_csv(f"{self.cd}\\df_description.csv",
+            self.df.describe().to_csv(f"{cd}\\df_description.csv",
                                       sep=';', decimal=',')
             summary_list = []
             summary_list.append("\nDataframe Info:")
@@ -412,9 +405,7 @@ class TransformedData(CleanedData):
         super().__init__(**kwargs)
         self.clean_data()
         self.startdate = np.datetime64('2016-04-01')
-        day = np.array((self.df['date']-self.startdate).dt.days + 1)
-        self.arr_day = day.reshape(-1, 1)
-        self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
+        self.df['day'] = (self.df['date']-self.startdate).dt.days + 1
     
     def transform_data(self) -> None:
         print("Daten werden transformiert...")
@@ -443,6 +434,10 @@ class FeaturedData(TransformedData):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.transform_data()
+        self.features = ('month', 'year', 'dayofmonth', 'weekday', 
+                         'weekofyear', 'dayofyear', 'season')
+        self.date_features()
+        self.df_only_features = self.df_features[list(self.features)]
     
     def date_features(self, column_name='date') -> None:
         self.df_features = self.df.copy()
@@ -486,7 +481,7 @@ class VizdData(TransformedData):
         ax.set_xlabel('Anzahl der Notrufe')
         ax.set_ylabel('Gesamtnachfrage')
         # Zeige das Diagramm
-        plt.savefig(f'{self.cd}\\demand_vs_calls.jpg')
+        plt.savefig(f'{cd}\\demand_vs_calls.jpg')
 
     def overview_scatter(self) -> None:
 
@@ -532,8 +527,33 @@ class VizdData(TransformedData):
             ax.set_ylim(top=ax.get_ylim()[1]*1.05)
 
         # Speichere das Diagramm
-        to_save_fig = f'{self.cd}\\overview_scatter.jpg'
+        to_save_fig = f'{cd}\\overview_scatter.jpg'
         plt.savefig(to_save_fig)
+
+class TransformedDataArrays:
+    def __init__(self,
+                 df: pd.DataFrame,
+                 test_days: int
+                 ) -> None:
+        self.arr_calls = np.array(df['calls']).reshape(-1, 1)
+        self.arr_day = np.array(df['day']).reshape(-1, 1)
+        self.arr_day_test = np.array(df['day'][-test_days:]).reshape(-1, 1)
+
+class TrainValTestData:
+
+    def __init__(self, 
+                 df_features: pd.DataFrame,
+                 s_target: pd.Series,
+                 test_days: int,
+                 features: tuple(str)
+                 ) -> None:
+        self.X = df_features[list(features)]
+        self.y = s_target
+        self.X_train_val = self.X[:-test_days]
+        self.y_train_val = self.y[:-test_days]
+        self.X_test = self.X[-test_days:]
+        self.y_test = self.y[-test_days:]
+
 
 class RegressionCallsDemand(TransformedData):
 
@@ -549,38 +569,156 @@ class RegressionCallsDemand(TransformedData):
         self.scr_reg_calls_demand = self.ftd_reg_calls_demand.score(self.arr_reg_calls, self.arr_reg_demand)
 
         file = 'model_linear_reg_demand.skops'
-        sio.dump(self.ftd_reg_calls_demand, f'{self.cd}\\{file}')
+        sio.dump(self.ftd_reg_calls_demand, f'{cd}\\{file}')
     
     def pred_calls_demand(self) -> None:
         pred_demand = self.ftd_reg_calls_demand.predict(self.arr_reg_calls)
         self.pred_demand = np.round(pred_demand, 0).astype(int)
 
+def my_model_options(df):
+
+    # Merkmalsvariablen von Zielvariable trennen
+    X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
+    y = df['calls_reg_act_diff']
+    X_train = X[:-47]
+    y_train = y[:-47]
+    X_test = X[-47:]
+    y_test = y[-47:]
+
+    # Random Forest Regressor erstellen
+    rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
+
+    estimator = DecisionTreeRegressor(max_depth=5, min_samples_split=3)
+    adabr = AdaBoostRegressor(estimator=estimator,
+                              n_estimators=130, 
+                              random_state=42, 
+                              learning_rate=0.36)
+    models = [rf, adabr]
+
+    rf.fit(X_train, y_train)
+    adabr.fit(X_train, y_train)
+
+    # Persist das Modell mit skops
+    sio.dump(adabr, f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops')
+    sio.dump(rf, f'{current_directory}\\..\\Modeling\\model_randomforestreg.skops')
+
+    # Sorted Feature Importance
+    feature_gini_importance = pd.Series(rf.feature_importances_, index=X_train.columns)
+
+    # Vorhersagen auf Testdaten
+    predictions_rf = rf.predict(X_test)
+    predictions_adabr = adabr.predict(X_test)
+
+    # Series der Vorhersagen aller X-Werte
+    full_pred_rf = rf.predict(X)
+    full_pred_adabr = adabr.predict(X)
+
+
+    # Vorhersagen der Modelle in den DataFrame einfügen
+    df['randforest_pred'] = full_pred_rf
+    df['adaboost_pred'] = full_pred_adabr
+
+    # Berechne mean squared error für die Vorhersagen
+    mse_rf = mean_squared_error(y_test, predictions_rf)
+    r2_rf = r2_score(y_test, predictions_rf)
+
+    mse_adabr = mean_squared_error(y_test, predictions_adabr)
+    r2_adabr = r2_score(y_test, predictions_adabr)
+
+    # Dictionary mit den Ergebnissen
+    results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
+    results_df = pd.DataFrame(results, index=[0])
+
+    return df, feature_gini_importance, results_df, models
+
+class AdaBooR:
+    def __init__(self, X_train, X_test, y_train, y_test):
+        """Klasse für AdaBoost Vorhersagen"""
+        self.adabr_mit_params = self.adabr_model()
+        self.adabr_fitd = self.adabr_mit_params.fit(X_train, y_train)
+        self.adabr_pred = np.round(self.adabr_fitd.predict(X_test), 0).astype(int)
+        self.mse = mean_squared_error(y_test, self.adabr_pred)
+        self.gini_importance = pd.Series(self.adabr_fitd.feature_importances_, 
+                                         index=X_train.columns)
+
+    def adabr_model(self):
+        estimator = DecisionTreeRegressor(max_depth=5, min_samples_split=3)
+
+        adabr = AdaBoostRegressor(estimator=estimator, n_estimators=130,
+                                  random_state=42, learning_rate=0.36
+                                  )
+        return adabr
+
+def adaboo_fut_predict(self):
+    """Vorhersage der Anzahl der Notrufe"""
+    df = future(self.df1)
+    miss_adaboost_pred = df['adaboost_pred'].isna() # Series mit True/False, ob Wert fehlt
+    features = df.loc[miss_adaboost_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
+    adaboost_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
+    df.loc[miss_adaboost_pred, 'adaboost_pred'] = adaboost_pred # Füge Vorhersage in df ein wo Wert fehlt
+    return df
+    
 class DataPrediction(FeaturedData):
 
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)      
+        super().__init__(**kwargs)
+        self.arrays = TransformedDataArrays(self.df, test_days=47)
+        self.fit_trend()
+        self.pred_trend()
+        self.detrend()
+        self.train_val_test = TrainValTestData(self.df_only_features,
+                                               s_target=self.target,
+                                               test_days=47,
+                                               features=self.features,
+                                               )
+        self.my_adaboor = self.my_adaboor()
+        self.my_pred_calls = self.reg_test_pred().reshape(-1)
+        self.final_ada_pred = self.my_adaboor.adabr_pred + self.my_pred_calls
 
     def fit_trend(self) -> None:
-        self.trend_reg = LinearRegression().fit(self.arr_day, self.arr_calls)
-        self.trend_score = self.trend_reg.score(self.arr_day, self.arr_calls)
+        self.trend_reg = LinearRegression().fit(self.arrays.arr_day, 
+                                                self.arrays.arr_calls)
+        self.trend_score = self.trend_reg.score(self.arrays.arr_day, 
+                                                self.arrays.arr_calls)
 
         file = 'model_linear_reg_trend.skops'
-        sio.dump(self.trend_reg, f'{self.cd}\\{file}')
+        sio.dump(self.trend_reg, f'{cd}\\{file}')
     
     def pred_trend(self) -> None:
-        pred_calls = self.trend_reg.predict(self.arr_day)
-        self.df['calls_reg_pred'] = np.round(pred_calls, 0).astype(int).reshape(-1)
+        pred_calls = self.trend_reg.predict(self.arrays.arr_day)
+        self.df['calls_reg_pred'] = np.round(pred_calls, 
+                                             0
+                                             ).astype(int).reshape(-1)
     
     def detrend(self) -> None:
-        self.df['calls_reg_act_diff'] = self.df['calls'] - self.df['calls_reg_pred']
+        self.df['calls_reg_act_diff'] = self.df['calls'] -\
+            self.df['calls_reg_pred']
+        self.target = self.df['calls_reg_act_diff']
 
-    def my_plot(self) -> None:
-        # Streuungsdiagramm mit 'date' auf der x-Achse
-        # und 'calls' als Punkte und 'calls_pred' als Linie
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.scatter(self.df['date'], self.df['calls'], s=3)
-        ax.plot(self.df['date'], self.df['calls_reg_pred'], color='red')
-        plt.savefig(f'{self.cd}\\notruf_reg.jpg')
+    def my_adaboor(self):
+        my_adaboor = AdaBooR(self.train_val_test.X_train_val,
+                             self.train_val_test.X_test,
+                             self.train_val_test.y_train_val,
+                             self.train_val_test.y_test)
+        return my_adaboor
+
+    def reg_test_pred(self):
+        arr_pred_calls = self.trend_reg.predict(self.arrays.arr_day_test)
+        return arr_pred_calls
+    
+
+    # Nachfrage basierend auf reg_adaboost_pred
+    # x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
+    # nachfrage_pred = calls_demand_reg.predict(x_calls)
+    # df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
+
+def plot_notruf_reg(df) -> None:
+    # Streuungsdiagramm mit 'date' auf der x-Achse
+    # und 'calls' als Punkte und 'calls_pred' als Linie
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.scatter(df['date'], df['calls'], s=3)
+    ax.plot(df['date'], df['calls_reg_pred'], color='red')
+    plt.savefig(f'{cd}\\notruf_reg.jpg')
 
 def no_trend_scatter(df):
     # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
@@ -669,62 +807,6 @@ def cross_val(model, X, y, cv):
                      index=index, dtype='float64')
     
     return means, stds
-
-def my_model_options(df):
-
-    # Merkmalsvariablen von Zielvariable trennen
-    X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_reg_act_diff']
-    X_train = X[:-47]
-    y_train = y[:-47]
-    X_test = X[-47:]
-    y_test = y[-47:]
-
-    # Random Forest Regressor erstellen
-    rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
-
-    estimator = DecisionTreeRegressor(max_depth=5, min_samples_split=3)
-    adabr = AdaBoostRegressor(estimator=estimator,
-                              n_estimators=130, 
-                              random_state=42, 
-                              learning_rate=0.36)
-    models = [rf, adabr]
-
-    rf.fit(X_train, y_train)
-    adabr.fit(X_train, y_train)
-
-    # Persist das Modell mit skops
-    sio.dump(adabr, f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops')
-    sio.dump(rf, f'{current_directory}\\..\\Modeling\\model_randomforestreg.skops')
-
-    # Sorted Feature Importance
-    feature_gini_importance = pd.Series(rf.feature_importances_, index=X_train.columns)
-
-    # Vorhersagen auf Testdaten
-    predictions_rf = rf.predict(X_test)
-    predictions_adabr = adabr.predict(X_test)
-
-    # Series der Vorhersagen aller X-Werte
-    full_pred_rf = rf.predict(X)
-    full_pred_adabr = adabr.predict(X)
-
-
-    # Vorhersagen der Modelle in den DataFrame einfügen
-    df['randforest_pred'] = full_pred_rf
-    df['adaboost_pred'] = full_pred_adabr
-
-    # Berechne mean squared error für die Vorhersagen
-    mse_rf = mean_squared_error(y_test, predictions_rf)
-    r2_rf = r2_score(y_test, predictions_rf)
-
-    mse_adabr = mean_squared_error(y_test, predictions_adabr)
-    r2_adabr = r2_score(y_test, predictions_adabr)
-
-    # Dictionary mit den Ergebnissen
-    results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
-    results_df = pd.DataFrame(results, index=[0])
-
-    return df, feature_gini_importance, results_df, models
 
 def ts_split_train(df):
 

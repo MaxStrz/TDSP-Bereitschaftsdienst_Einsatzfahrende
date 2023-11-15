@@ -23,18 +23,11 @@ reg_class = data_prep.RegressionCallsDemand(**kwargs)
 reg_class.fit_calls_demand()
 reg_class.pred_calls_demand()
 
-trend = data_prep.DataPrediction(**kwargs)
-trend.fit_trend()
-trend.pred_trend()
-trend.detrend()
-trend.my_plot()
+prediction = data_prep.DataPrediction(**kwargs)
 
-cleaned_data = data_prep.NewCleanedData.my_data_from_csv('sickness_table.csv', 
-                                                column_names_types)
+data_prep.plot_notruf_reg(prediction.df)
 
-transformed_data = data_prep.NewTransformedData(cleaned_data.df)
-
-print(transformed_data.df_transformed.head())
+print(prediction.final_ada_pred)
 
 # stop running program here
 sys.exit()
