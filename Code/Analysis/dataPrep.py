@@ -28,19 +28,213 @@ warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.Perfor
 current_directory = os.path.dirname(__file__)
 cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
 relative_path_to_raw_folder = "../../Sample_Data/Raw/"
+relative_path_to_models_folder = "../Modeling"
 path_to_raw_folder = os.path.join(cd, relative_path_to_raw_folder)
+path_to_models_folder = os.path.join(cd, relative_path_to_models_folder)
 
-class KwargsNotUsed:
+# Configuration
+class Config:
+    _my_file_name = 'sickness_table.csv'
+    
+    _column_names_types = {'date': 'datetime64[ns]', 
+                          'n_sick': 'int16', 
+                          'calls': 'int32', 
+                          'n_duty': 'int16', 
+                          'n_sby': 'int16', 
+                          'sby_need': 'int16', 
+                          'dafted': 'int16',
+                          }
+    
+    _features = ('month', 'dayofmonth', 'weekday', 'weekofyear', 
+                 'dayofyear', 'season')
+    
+    dict_config = {'my_file_name':_my_file_name, 
+                   'column_names_types':_column_names_types,
+                   'features':_features,
+                   }
+
+# Arrays für die Modelle
+class TransformedDataArrays:
+    def __init__(self,
+                 df: pd.DataFrame,
+                 test_days: int=47
+                 ) -> None:
+        self.arr_calls = np.array(df['calls']).reshape(-1, 1)
+        self.arr_day = np.array(df['day']).reshape(-1, 1)
+        self.arr_day_test = np.array(df['day'][-test_days:]).reshape(-1, 1)
+
+class TrainValTestData:
+
+    def __init__(self, 
+                 df_features: pd.DataFrame,
+                 s_target: pd.Series,
+                 features: tuple(str),
+                 test_days: int=47,
+                 ) -> None:
+        
+        self.X = df_features[list(features)]
+        self.y = s_target
+        self.X_train_val = self.X[:-test_days]
+        self.y_train_val = self.y[:-test_days]
+        self.X_test = self.X[-test_days:]
+        self.y_test = self.y[-test_days:]
+
+# Modelle
+
+class RegressionCallsDemand:
+
+    def __init__(self, 
+                 df_calls_demand: pd.DataFrame
+                 ) -> None:
+        calls = np.array(df_calls_demand['calls']).reshape(-1, 1)
+        sby_needed = df_calls_demand.query('demand > 0')
+        X = np.array(sby_needed['calls']).reshape(-1, 1)
+        y = np.array(sby_needed['demand']).reshape(-1, 1)
+        self.model_ftd_reg_calls_demand = model_ftd = self.fit(X, y)
+        self.mode_scr_reg_calls_demand = self.score(model_ftd, X, y)
+        self.arr_pred_demand = self.pred_calls_demand(model_ftd, calls)
+        self.save_model_skops('model_linear_reg_demand.skops', 
+                              model_ftd,
+                              path_to_models_folder)
+
+        
+    @staticmethod    
+    def fit(X: np.ndarray,
+            y: np.ndarray
+            ) -> LinearRegression:
+        model_fitted = LinearRegression().fit(X, y)        
+        return model_fitted
+    
+    @staticmethod
+    def score(model: LinearRegression,
+              X: np.ndarray,
+              y: np.ndarray
+              ) -> np.float64:
+        model_score = model.score(X, y)
+        return model_score
+
+    @staticmethod
+    def pred_calls_demand(fitted_model: LinearRegression,
+                          X: np.ndarray
+                          ) -> np.ndarray:
+        pred_demand = fitted_model.predict(X)
+        pred_demand = np.round(pred_demand, 0).astype(int)
+        return pred_demand
+    
+    @staticmethod
+    def save_model_skops(file_name: str,
+                         model,
+                         folder_path: str=cd
+                         ) -> None:
+        
+        file_path = os.path.join(folder_path, file_name)
+        sio.dump(model, file_path)
+
+class DataTrend:
+    def __init__(self,
+                df: pd.DataFrame,
+                ) -> None:
+        self.arrays = TransformedDataArrays(df)
+        X = self.arrays.arr_day
+        y = self.arrays.arr_calls
+        self.model_ftd = LinearRegression().fit(X, y)
+        self.trend_score = self.model_ftd.score(X, y)
+        self.save_model = self.save_model_skops('model_linear_reg_trend.skops',
+                                                self.model_ftd,
+                                                path_to_models_folder)
+        self.calls_reg_pred = self.pred_trend(self.model_ftd, X)
+        self.calls_reg_act_diff = self.detrend(df, self.calls_reg_pred)
+    
+    @staticmethod
+    def save_model_skops(file_name: str,
+                         model,
+                         folder_path: str=cd
+                         ) -> None:
+        
+        file_path = os.path.join(folder_path, file_name)
+        sio.dump(model, file_path)
+    
+    @staticmethod
+    def pred_trend(model_ftd: LinearRegression,
+                   X: np.ndarray
+                   ) -> np.ndarray:
+        pred_calls = model_ftd.predict(X)
+        pred_calls = np.round(pred_calls, 0).astype(int).reshape(-1)
+
+        return pred_calls
+    
+    @staticmethod
+    def detrend(df: pd.DataFrame,
+                calls_reg_pred: np.ndarray
+                ) -> np.ndarray:
+        calls_reg_act_diff = df['calls'] - calls_reg_pred
+        return calls_reg_act_diff
+
+class AdaBooReg:
+    def __init__(self, 
+                 X_train, 
+                 X_test, 
+                 y_train, 
+                 y_test) -> None:
+        """Klasse für AdaBoost Vorhersagen"""
+        self.X_test = X_test
+        self.params_dict = params = {"adabooreg":
+                                     {"n_estimators":130, 
+                                      'learning_rate':0.36},
+                                      "dtreg":
+                                      {"criterion":'squared_error',
+                                       "splitter":"best",#
+                                       "max_depth":5,
+                                       "min_samples_split":3}
+                                       }
+        self.adabooreg_mit_params = mit_params = self.adabooreg_model(params)
+        self.adabooreg_ftd = model_ftd = mit_params.fit(X_train, y_train)
+        self.adabooreg_pred_train = np.round(model_ftd.predict(X_train), 
+                                             0).astype(int)
+        self.adabooreg_pred = y_test_pred = np.round(model_ftd.predict(X_test),
+                                                     0).astype(int)
+        self.adabooreg_pred_all = np.concatenate((self.adabooreg_pred_train,
+                                                  self.adabooreg_pred))
+        self.my_metrics = self.metrics_calc(y_test, y_test_pred)
+        self.gini_importance = pd.Series(model_ftd.feature_importances_,
+                                         index=X_train.columns)
+        
+    def adabooreg_model(self,
+                        params: dict[str, dict]
+                        ) -> AdaBoostRegressor:
+        estimator = DecisionTreeRegressor(**params['dtreg'])
+
+        adabr = AdaBoostRegressor(estimator=estimator,
+                                  random_state=42,
+                                  **params['adabooreg']
+                                  )
+        return adabr
+    
+    def metrics_calc(self,
+                     y_test: np.ndarray,
+                     adabooreg_pred: np.ndarray
+                     ) -> dict[str, np.float64]:
+    
+        mse = mean_squared_error(y_test, adabooreg_pred)
+        r2 = r2_score(y_test, adabooreg_pred)
+        metrics = {'mse':mse, 'r2':r2}
+        return metrics
+
+# Data 
+class _KwargsNotUsed:
     def __init__(self, **kwargs) -> None:
         self.not_used_kwargs = kwargs
 
-class RawDataPath(KwargsNotUsed):
-    def __init__(self, my_file_name: str, **kwargs) -> None:
+class _RawDataPath(_KwargsNotUsed):
+    def __init__(self, 
+                 my_file_name: str, 
+                 **kwargs
+                 ) -> None:
         super().__init__(**kwargs)
         self.file_path = os.path.join(path_to_raw_folder, my_file_name)
         print(f"Pfad zur CSV-Datei: {my_file_name} erstellt.")
 
-class CleanedData(RawDataPath):
+class CleanedData(_RawDataPath):
     def __init__(self, 
                  column_names_types: dict[str, str], 
                  **kwargs
@@ -51,16 +245,15 @@ class CleanedData(RawDataPath):
         self.column_names_types = column_names_types
         self.column_names = column_names_types.keys()
         self.column_types = column_names_types.values()
-        self.df = self.make_df(self.file_path, self.column_names)
-        self.missing(self.df)
-        self.is_whole_int(self.df, column_names_types)
-        self.df = self.df.astype(column_names_types)
-        self.check_sby_duty_values(self.df)
-        self.summary_list = self.df_summary(self.df)
+        self.df_from_csv = self._make_df(self.file_path, self.column_names)
+        self._missing(self.df_from_csv)
+        self._is_whole_int(self.df_from_csv, column_names_types)
+        self.df_cleaned = self.df_from_csv.astype(column_names_types)
+        self._check_sby_duty_values(self.df_cleaned)
+        self.summary_list = self._df_summary(self.df_cleaned)
         print("Daten bereinigt und in DataFrame umgewandelt.")
 
-    
-    def make_df(self,
+    def _make_df(self,
                 file_path: str,
                 column_names: list[str],
                 date_column_name: str='date'
@@ -79,7 +272,7 @@ class CleanedData(RawDataPath):
 
         return df
 
-    def missing(self, df: pd.DataFrame) -> None:
+    def _missing(self, df: pd.DataFrame) -> None:
         """
         Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
         gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
@@ -123,7 +316,7 @@ class CleanedData(RawDataPath):
             note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
             self.df_build_notes.append(note)
 
-    def is_whole_int(self,
+    def _is_whole_int(self,
                        df: pd.DataFrame,
                        column_names_types: dict[str, str]
                        ) -> None:
@@ -164,7 +357,7 @@ class CleanedData(RawDataPath):
             note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
             self.df_build_notes.append(note)
 
-    def missing_dates(self, 
+    def _missing_dates(self, 
                         df: pd.DataFrame,
                         date_column_name: str='date'
                         ) -> None:
@@ -186,14 +379,14 @@ class CleanedData(RawDataPath):
             print(f"Die fehlenden Daten sind: {missing_dates}")
             raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
 
-    def check_sby_duty_values(self, df) -> None:
+    def _check_sby_duty_values(self, df) -> None:
         n_sby = df['n_sby'].unique()
         self.df_build_notes.append(f"Werte in der n_sby-Spalte:{n_sby}")
 
         n_duty = df['n_duty'].unique()
         self.df_build_notes.append(f"Werte in der n_duty-Spalte:{n_duty}")
 
-    def df_summary(self, df: pd.DataFrame) -> None:
+    def _df_summary(self, df: pd.DataFrame) -> None:
             """Gibt eine Zusammenfassung des DataFrames aus"""
 
             df.describe().to_csv(f"{cd}\\df_description.csv",
@@ -213,10 +406,15 @@ class TransformedData(CleanedData):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.startdate = np.datetime64('2016-04-01')
-        self.df['day'] = (self.df['date']-self.startdate).dt.days + 1
-        self.df = self.create_demand(self.df)
-        self.df = self.n_sick_adjusted(self.df)
+        self.startdate = sd = np.datetime64('2016-04-01')
+        self.df_tformed = self.df_cleaned.copy()
+        self.df_tformed['day'] = (self.df_cleaned['date']-sd).dt.days + 1
+        self.df_tformed = self.create_demand(self.df_tformed)
+        self.df_tformed = self.n_sick_adjusted(self.df_tformed)
+        self.df_tformed = self.predict_past_demand(self.df_tformed)
+        self.trend_reg = t = DataTrend(self.df_tformed)
+        self.df_tformed['calls_reg_pred'] = t.calls_reg_pred
+        self.df_tformed['calls_reg_act_diff'] = t.calls_reg_act_diff
         print("Daten transformiert")
 
     def create_demand(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -244,70 +442,168 @@ class TransformedData(CleanedData):
 
         return df
 
-class TransformedDataArrays:
-    def __init__(self,
-                 df: pd.DataFrame,
-                 test_days: int=47
-                 ) -> None:
-        self.arr_calls = np.array(df['calls']).reshape(-1, 1)
-        self.arr_day = np.array(df['day']).reshape(-1, 1)
-        self.arr_day_test = np.array(df['day'][-test_days:]).reshape(-1, 1)
-
-class TrainValTestData:
-
-    def __init__(self, 
-                 df_features: pd.DataFrame,
-                 s_target: pd.Series,
-                 features: tuple(str),
-                 test_days: int=47,
-                 ) -> None:
+    def predict_past_demand(self,
+                            df: pd.DataFrame
+                            ) -> pd.DataFrame:
+        df['demand_pred'] = RegressionCallsDemand(df).arr_pred_demand
         
-        self.X = df_features[list(features)]
-        self.y = s_target
-        self.X_train_val = self.X[:-test_days]
-        self.y_train_val = self.y[:-test_days]
-        self.X_test = self.X[-test_days:]
-        self.y_test = self.y[-test_days:]
+        note = "Erfolgreich: Spalte 'demand_pred' erstellt"
+        self.df_build_notes.append(note)
+
+        return df
 
 class FeaturedData(TransformedData):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, 
+                 features: tuple[str, ...], 
+                 **kwargs) -> None:
         super().__init__(**kwargs)
-        self.features = ('month', 'year', 'dayofmonth', 'weekday', 
-                         'weekofyear', 'dayofyear', 'season')
-        self.date_features()
-        self.df_only_features = self.df_features[list(self.features)]
+        self.tup_features = features
+        self.df_features = self.add_date_features(self.df_tformed,
+                                                  self.tup_features)
+        self.df_only_features = self.df_features[list(self.tup_features)]
+        print('Features hinzugefügt')
     
-    def date_features(self, column_name='date') -> None:
-        self.df_features = self.df.copy()
-        c = self.df_features[column_name]
-        self.df_features['month'] = c.dt.month # Monat als Zahl (1-12)
-        self.df_features['year'] = c.dt.year # Jahr (4-stellig)
-        self.df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
-        # Wochentag als Zahl (Montag = 0, Sonntag = 6)
-        self.df_features['weekday'] = c.dt.weekday
-        # Kalenderwoche als Zahl (1-52)
-        self.df_features['weekofyear'] = c.dt.isocalendar().week
-        # Tag des Jahres als Zahl (1-365)
-        self.df_features['dayofyear'] = c.dt.dayofyear
+    def add_date_features(self,
+                             df: pd.DataFrame,
+                             features: tuple(str),
+                             date_column_name: str='date',
+                             ) -> None:
+        df_features = df.copy()
+        c = df_features[date_column_name]
+
+        if 'month' in features:
+            df_features['month'] = c.dt.month # Monat als Zahl (1-12)
+
+        if 'year' in features:
+            df_features['year'] = c.dt.year # Jahr (4-stellig)
+        
+        if 'dayofmonth' in features:
+            df_features['dayofmonth'] = c.dt.day # Tag des Monats (1-31)
+
+        if 'weekday' in features:
+            # Wochentag als Zahl (Montag = 0, Sonntag = 6)
+            df_features['weekday'] = c.dt.weekday
+
+        if 'weekofyear' in features:
+            # Kalenderwoche als Zahl (1-52)
+            df_features['weekofyear'] = c.dt.isocalendar().week
+
+        if 'dayofyear' in features:
+            # Tag des Jahres als Zahl (1-365)
+            df_features['dayofyear'] = c.dt.dayofyear
+        
         # Datum des 15. des vorherigen Monats
-        self.df_features['predict_day'] = c - DateOffset(months=1, day=15)
+        df_features['predict_day'] = c - DateOffset(months=1, day=15)
+
         # Anzahl der Tage seit dem ersten Tag im Datensatz
-        self.df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
+        df_features['day'] = (c - pd.Timestamp('2016-04-01')).dt.days + 1
 
-        m = self.df_features['month']
-        # Jahreszeit als Zahl (1-4) (1=Winter, 2=Frühling, 3=Sommer, 4=Herbst)
-        self.df_features['season'] = (m-1) % 12 // 3 + 1
+        if 'season' in features:
+            m = df_features['month']
+            # Jahreszeit als Zahl (1-4) (1=Winter, 2=Frühling, 3=Sommer, 4=Herbst)
+            df_features['season'] = (m-1) % 12 // 3 + 1
 
-        if 'calls' in self.df_features:
-            self.df_features['status'] = 'actual'
-
+        if 'calls' in df_features:
+            df_features['status'] = 'actual'
         else:
-            self.df_features['status'] = 'prediction'
+            df_features['status'] = 'prediction'
+        
+        cols = ", ".join([str(col) for col in list(features)])
+        note = f"Erfolgreich: Features {cols} hinzugefügt"
+        self.df_build_notes.append(note)
 
-class VizdData(TransformedData):
-    
+        return df_features
+
+# Vorhersagen
+class DataPrediction(FeaturedData):
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
+        self.df_pred = self.df_features.copy()
+        target = self.df_pred['calls_reg_act_diff']
+        self.train_val_test = TrainValTestData(self.df_only_features,
+                                               s_target=target,
+                                               test_days=47,
+                                               features=self.tup_features,
+                                               )
+        self.model_adabooreg = mab = self._make_adabooreg(self.train_val_test)
+        self.pred_reg_calls = self._reg_pred().reshape(-1)
+        self.final_ada_pred = mab.adabooreg_pred_all + self.pred_reg_calls
+        self.df_pred['adabooreg_reg_calls_pred'] = self.final_ada_pred
+        
+    @staticmethod
+    def _make_adabooreg(data: TrainValTestData) -> AdaBooReg:
+        model = AdaBooReg(data.X_train_val, 
+                          data.X_test, 
+                          data.y_train_val,
+                          data.y_test)
+        return model
+
+    def _reg_pred(self):
+        self.arrays = TransformedDataArrays(self.df_features)
+        arr_pred_calls = self.trend_reg.model_ftd.predict(self.arrays.arr_day)
+        return arr_pred_calls
+
+    @staticmethod
+    def _date_list_in_reg_out(date: list['datetime64'],
+                                startdate: 'datetime64'
+                                ) -> np.array:
+
+        # Regression für Notrufe
+        skop_reg = f'{cd}\\..\\Modeling\\model_linear_reg.scops'
+        reg_trend = sio.load(skop_reg, trusted=True)
+        x = np.array((date-startdate).astype('timedelta64[D]') + \
+                    np.timedelta64(1, 'D'))
+
+        # numpy array aus series date
+        x = x.reshape(-1, 1).astype(int)
+        calls_reg_pred = reg_trend.predict(x).reshape(-1)
+
+        return calls_reg_pred
+
+    def df_predict_sby_need(self,
+                   date: list[str]
+                   ) -> pd.Series: 
+
+        date = [np.datetime64(date) for date in date]
+
+        calls_reg_pred = DataPrediction._date_list_in_reg_out(date, 
+                                                              self.startdate)
+
+        # Vorhersage des AdaBoost-Regressors
+        #skop_adaboost = f'{cd}\\..\\Modeling\\model_adaboostreg.skops'
+        #model_adaboostreg = sio.load(skop_adaboost, trusted=True)
+        df_date = pd.DataFrame(date, columns=['date'])
+        df_pred = self.add_date_features(df_date, self.tup_features)
+        df_pred_2 = df_pred[list(self.tup_features)]
+        adabooreg_pred = self.model_adabooreg.adabooreg_ftd.predict(df_pred_2).reshape(-1)
+
+        # gesamte Vorhersage von Notrufen
+        pred = calls_reg_pred + adabooreg_pred
+
+        # Vorhersage der Nachfrage an Einsatzfahrenden
+        skop_demand = f'{cd}\\model_linear_reg_demand.skops'
+        model_demand = sio.load(skop_demand, trusted=True)
+        sby_plus_duty = model_demand.predict(pred.reshape(-1, 1))
+
+        # Subtrahieren von n_duty, vorausgestetzt n_duty ist 1900
+        sby_need = np.round(((sby_plus_duty - 1900).reshape(-1)), 0).astype(int)
+
+        sby_need_series = pd.Series(sby_need, index=date, name='sby_need_pred')
+
+        s_sby_need = pd.Series(sby_need, name='sby_need_pred')
+        s_adabooreg_pred = pd.Series(adabooreg_pred, name='adabooreg_pred')
+        s_calls_reg_pred = pd.Series(calls_reg_pred, name='calls_reg_pred')
+
+        df_pred = pd.concat([df_pred['date'], s_sby_need], axis=1)
+
+        return df_pred
+
+# Visualisierungen
+class VizualisedData:
+    
+    def __init__(self, df: pd.DataFrame) -> None:
+        self.df = df
 
     def demand_vs_calls(self) -> None:
         # Erstelle ein Streuungsdiagramm mit 'sby_need' auf der x-Achse und 'calls' auf der y-Achse
@@ -367,184 +663,116 @@ class VizdData(TransformedData):
         to_save_fig = f'{cd}\\overview_scatter.jpg'
         plt.savefig(to_save_fig)
 
-class RegressionCallsDemand(TransformedData):
+    def plot_notruf_reg(self) -> None:
+        # Streuungsdiagramm mit 'date' auf der x-Achse
+        # und 'calls' als Punkte und 'calls_pred' als Linie
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.scatter(self.df['date'], self.df['calls'], s=3)
+        ax.plot(self.df['date'], self.df['calls_reg_pred'], color='red')
+        plt.savefig(f'{cd}\\notruf_reg.jpg')
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        sby_needed = self.df[['calls', 'demand']].query('demand > 0')
-        self.arr_reg_calls = np.array(sby_needed['calls']).reshape(-1, 1)
-        self.arr_reg_demand = np.array(sby_needed['demand']).reshape(-1, 1)
+    def no_trend_scatter(self) -> None:
+        # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 10))
+        date = self.df['date']
+        calls = self.df['calls']
+        calls_reg_act_diff = self.df['calls_reg_act_diff']
+        calls_reg_pred = self.df['calls_reg_pred']
 
-    def fit_calls_demand(self) -> None:
-        self.ftd_reg_calls_demand = LinearRegression().fit(self.arr_reg_calls, self.arr_reg_demand)
-        self.scr_reg_calls_demand = self.ftd_reg_calls_demand.score(self.arr_reg_calls, self.arr_reg_demand)
+        ax1.scatter(date, calls, s=3)
+        ax1.plot(date, calls_reg_pred, color='red')
+        ax2.scatter(date, calls_reg_act_diff, s=3)
 
-        file = 'model_linear_reg_demand.skops'
-        sio.dump(self.ftd_reg_calls_demand, f'{cd}\\{file}')
-    
-    def pred_calls_demand(self) -> None:
-        pred_demand = self.ftd_reg_calls_demand.predict(self.arr_reg_calls)
-        self.pred_demand = np.round(pred_demand, 0).astype(int)
-
-class AdaBooR:
-    def __init__(self, X_train, X_test, y_train, y_test):
-        """Klasse für AdaBoost Vorhersagen"""
-        self.X_test = X_test
-        self.params_dict = self.make_params_dict()
-        self.adabr_mit_params = self.adabr_model()
-        self.adabr_fitd = self.adabr_mit_params.fit(X_train, y_train)
-        self.adabr_pred_train = np.round(self.adabr_fitd.predict(X_train), 0).astype(int)
-        self.adabr_pred = np.round(self.adabr_fitd.predict(X_test), 0).astype(int)
-        self.my_metrics = self.metrics_calc(y_test, self.adabr_pred)
-        self.gini_importance = pd.Series(self.adabr_fitd.feature_importances_, 
-                                         index=X_train.columns)
-
-    def make_params_dict(self):
-        params = {"n_estimators":130,
-                  'learning_rate':0.36,
-                  "est__criterion":'squared_error',
-                  "est__splitter":"best",
-                  "est__max_depth":5,
-                  "est__min_samples_split":3
-                  }
-        return params
+        # Hauptmarkierung der x-Achse Monatsnamen in abgekürzter Form
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+        # Hauptmarkierung der x-Achse mit Interval von 3 Monaten
+        ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+        # Nebenmarkierung der x-Achse als Jahr
+        ax2.xaxis.set_minor_formatter(mdates.DateFormatter('%Y'))
+        # Nebenmarkierung für jedes Jahr
+        ax2.xaxis.set_minor_locator(mdates.YearLocator())
         
-    def adabr_model(self):
-        estimator = DecisionTreeRegressor(max_depth=self.params_dict['est__max_depth'], 
-                                          min_samples_split=self.params_dict['est__min_samples_split'],
-                                          criterion=self.params_dict['est__criterion'],
-                                          splitter=self.params_dict['est__splitter']
-                                          )
+        ax1.tick_params(axis='x', which='both', length=0)
+        ax1.set_yticks(np.arange(4000, 13000, 1000))
+        ax2.tick_params(axis='x', which='minor', length=10, pad=25)
+        ax2.tick_params(axis='x', which='major', length=5)
 
-        adabr = AdaBoostRegressor(estimator=estimator,
-                                  n_estimators=self.params_dict['n_estimators'],
-                                  random_state=42,
-                                  learning_rate=self.params_dict['learning_rate']
-                                  )
-        return adabr
+        # Beschriftung der Achsen und Titel
+        ax1.set_title('Trends der Notrufe')
+        ax1.set_ylabel('Anzahl der Notrufe')
+        ax2.set_title('Stationäre Komponente der Notrufe')
+        ax2.set_ylabel('Abweichung von\n Regressionsgeraden')
+
+        for ax in fig.get_axes():
+            # y-Achse für alle Axen in Figure - 5% des kleinsten Werts der jeweiligen Spalte
+            ax.set_ylim(bottom=ax.get_ylim()[0]-500)
+            # y-Achse für alle Axen in Figure + 5% des höchsten Werts der jeweiligen Spalte
+            ax.set_ylim(top=ax.get_ylim()[1]+500)
+
+        # Speichere das Diagramm
+        to_save_fig = f'{cd}\\no_trend_scatter.jpg'
+        plt.savefig(to_save_fig)
+
+    def actual_vs_pred(self):
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        ax.scatter(self.df['date'], 
+                   self.df['demand_pred'], 
+                   s=3, 
+                   color='blue')
+        
+        ax.scatter(self.df['date'], 
+                   self.df['nachfrage_pred'],
+                   s=3, 
+                   color='red')
+
+        ax.set_title('Actual vs. Predicted Demand')
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Demand')
+
+        plt.savefig(f'{cd}\\demand_vs_adaboo.jpg')
     
-    def metrics_calc(self, y_test, adabr_pred):
-        mse = mean_squared_error(y_test, adabr_pred)
-        r2 = r2_score(y_test, adabr_pred)
-        metrics = {'mse':mse, 'r2':r2}
-        return metrics
+    def scat_act_pred(self):
+        # Erstelle ein Streuungsdiagramm mit 'date' auf der 
+        # x-Achse und 'calls' auf der y-Achse
+        fig, ax = plt.subplots()
+        # Aus der 'type'-Spalte sind 'Actual'-Daten blau und 
+        # 'Prediction'-Daten rot
+        ax.scatter(self.df['date'], 
+                   self.df['calls'], 
+                   s=3, 
+                   color=self.df['type'].map({'actual':'blue', 
+                                              'prediction':'red'}))
+        # Achsenbeschriftung
+        ax.set_xlabel('Datum')
+        ax.set_ylabel('Anzahl der Notrufe')
+        # Zeige das Diagramm
+        plt.show()
 
-def adaboo_fut_predict(self):
-    """Vorhersage der Anzahl der Notrufe"""
-    df = future(self.df1)
-    miss_adaboost_pred = df['adaboost_pred'].isna() # Series mit True/False, ob Wert fehlt
-    features = df.loc[miss_adaboost_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
-    adaboost_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
-    df.loc[miss_adaboost_pred, 'adaboost_pred'] = adaboost_pred # Füge Vorhersage in df ein wo Wert fehlt
-    return df
+    def plot_train_test(self):
+        fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 
+                                               1, 
+                                               sharex=True, 
+                                               figsize=(10, 8))
+        date = self.df['date']
+        y_1 = self.df['calls_reg_act_diff']
+        y_2 = self.df['randforest_pred']
+        y_3 = self.df['adaboost_pred']
+        # Beide y-Achsen in einem figure als Streuungsdiagramme mit kleinen Punkten
+        ax_1.scatter(date, y_1, color='red', marker='.')
+        ax_2.scatter(date, y_2, color='blue', marker='.')
+        ax_3.scatter(date, y_3, color='green', marker='.')
+        # Achsenbeschriftung
+        ax_1.set_xlabel('Datum')
+        ax_1.set_ylabel('Calls_reg_act_diff')
+        ax_2.set_ylabel('randforest_pred')
+        ax_3.set_ylabel('adaboost_pred')
+        
+        ax_1.set_title('Calls_reg_act_diff und Predictions')
+        
+        plt.show()
 
-class DataTrend(FeaturedData):
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.arrays = TransformedDataArrays(self.df, test_days=47)
-        self.fit_trend()
-        self.pred_trend()
-        self.detrend()
-    
-    def fit_trend(self) -> None:
-        self.trend_reg = LinearRegression().fit(self.arrays.arr_day, 
-                                                self.arrays.arr_calls)
-        self.trend_score = self.trend_reg.score(self.arrays.arr_day, 
-                                                self.arrays.arr_calls)
-
-        file = 'model_linear_reg_trend.skops'
-        sio.dump(self.trend_reg, f'{cd}\\{file}')
-    
-    def pred_trend(self) -> None:
-        pred_calls = self.trend_reg.predict(self.arrays.arr_day)
-        self.df['calls_reg_pred'] = np.round(pred_calls, 
-                                             0
-                                             ).astype(int).reshape(-1)
-    
-    def detrend(self) -> None:
-        self.df['calls_reg_act_diff'] = self.df['calls'] -\
-            self.df['calls_reg_pred']
-        self.target = self.df['calls_reg_act_diff']
-
-class DataPrediction(DataTrend):
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.train_val_test = TrainValTestData(self.df_only_features,
-                                               s_target=self.target,
-                                               test_days=47,
-                                               features=self.features,
-                                               )
-        self.my_adaboor = self.my_adaboor()
-        self.my_pred_calls = self.reg_test_pred().reshape(-1)
-        self.final_ada_pred = self.my_adaboor.adabr_pred + self.my_pred_calls
-
-    def my_adaboor(self):
-        my_adaboor = AdaBooR(self.train_val_test.X_train_val,
-                             self.train_val_test.X_test,
-                             self.train_val_test.y_train_val,
-                             self.train_val_test.y_test)
-        return my_adaboor
-
-    def reg_test_pred(self):
-        arr_pred_calls = self.trend_reg.predict(self.arrays.arr_day_test)
-        return arr_pred_calls
-    
-
-    # Nachfrage basierend auf reg_adaboost_pred
-    # x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
-    # nachfrage_pred = calls_demand_reg.predict(x_calls)
-    # df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
-
-def plot_notruf_reg(df) -> None:
-    # Streuungsdiagramm mit 'date' auf der x-Achse
-    # und 'calls' als Punkte und 'calls_pred' als Linie
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.scatter(df['date'], df['calls'], s=3)
-    ax.plot(df['date'], df['calls_reg_pred'], color='red')
-    plt.savefig(f'{cd}\\notruf_reg.jpg')
-
-def no_trend_scatter(df):
-    # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(10, 10))
-    date = df['date']
-    calls = df['calls']
-    calls_reg_act_diff = df['calls_reg_act_diff']
-    calls_reg_pred = df['calls_reg_pred']
-
-    ax1.scatter(date, calls, s=3)
-    ax1.plot(date, calls_reg_pred, color='red')
-    ax2.scatter(date, calls_reg_act_diff, s=3)
-
-    # Hauptmarkierung der x-Achse Monatsnamen in abgekürzter Form
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
-    # Hauptmarkierung der x-Achse mit Interval von 3 Monaten
-    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    # Nebenmarkierung der x-Achse als Jahr
-    ax2.xaxis.set_minor_formatter(mdates.DateFormatter('%Y'))
-    # Nebenmarkierung für jedes Jahr
-    ax2.xaxis.set_minor_locator(mdates.YearLocator())
-    
-    ax1.tick_params(axis='x', which='both', length=0)
-    ax1.set_yticks(np.arange(4000, 13000, 1000))
-    ax2.tick_params(axis='x', which='minor', length=10, pad=25)
-    ax2.tick_params(axis='x', which='major', length=5)
-
-    # Beschriftung der Achsen und Titel
-    ax1.set_title('Trends der Notrufe')
-    ax1.set_ylabel('Anzahl der Notrufe')
-    ax2.set_title('Stationäre Komponente der Notrufe')
-    ax2.set_ylabel('Abweichung von\n Regressionsgeraden')
-
-    for ax in fig.get_axes():
-        # y-Achse für alle Axen in Figure - 5% des kleinsten Werts der jeweiligen Spalte
-        ax.set_ylim(bottom=ax.get_ylim()[0]-500)
-        # y-Achse für alle Axen in Figure + 5% des höchsten Werts der jeweiligen Spalte
-        ax.set_ylim(top=ax.get_ylim()[1]+500)
-
-    # Speichere das Diagramm
-    to_save_fig = f'{current_directory}\\no_trend_scatter.jpg'
-    plt.savefig(to_save_fig)
+# Kreuzvalidierung
 
 def cross_val(model, X, y, cv):
     results = cross_validate(
@@ -629,37 +857,6 @@ def ts_split_train(df):
     
     print(pd.DataFrame(val_dict))
 
-def plot_train_test(full_pred_df, df):
-    fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 1, sharex=True, figsize=(10, 8))
-    date = df['date']
-    y_1 = df['calls_reg_act_diff']
-    y_2 = full_pred_df['randforest_pred']
-    y_3 = full_pred_df['adaboost_pred']
-    # Beide y-Achsen in einem figure als Streuungsdiagramme mit kleinen Punkten
-    ax_1.scatter(date, y_1, color='red', marker='.')
-    ax_2.scatter(date, y_2, color='blue', marker='.')
-    ax_3.scatter(date, y_3, color='green', marker='.')
-    # Achsenbeschriftung
-    ax_1.set_xlabel('Datum')
-    ax_1.set_ylabel('Calls_reg_act_diff')
-    ax_2.set_ylabel('randforest_pred')
-    ax_3.set_ylabel('adaboost_pred')
-    
-    ax_1.set_title('Calls_reg_act_diff und Predictions')
-    
-    plt.show()
-
-def scat_act_pred(df):
-    # Erstelle ein Streuungsdiagramm mit 'date' auf der x-Achse und 'calls' auf der y-Achse
-    fig, ax = plt.subplots()
-    # Aus der 'type'-Spalte sind 'Actual'-Daten blau und 'Prediction'-Daten rot
-    ax.scatter(df['date'], df['calls'], s=3, color=df['type'].map({'actual':'blue', 'prediction':'red'}))
-    # Achsenbeschriftung
-    ax.set_xlabel('Datum')
-    ax.set_ylabel('Anzahl der Notrufe')
-    # Zeige das Diagramm
-    plt.show()
-
 def model_cross_val(df):
 
     # Merkmalsvariablen von Zielvariable trennen
@@ -734,23 +931,6 @@ def adaboo_gscv(df):
     # speichere das DataFrame als pickle
     appended.to_pickle(f'{current_directory}\\adaboo_gscv_df.pkl')
 
-def demand_pred_final(df2, trend_reg, calls_demand_reg):
-
-    startdate = np.datetime64('2016-04-01')
-    x2 = np.array((df2['date']-startdate).dt.days + 1).reshape(-1, 1)
-    trend_2 = trend_reg.predict(x2)
-    calls_pred_2 = (np.round(trend_2, 0)).astype(int)
-    df2['calls_reg_pred_2'] = calls_pred_2.reshape(-1)
-
-    df2['reg_adaboost_pred'] = df2['calls_reg_pred_2'] + df2['adaboost_pred']
-
-    # Nachfrage basierend auf reg_adaboost_pred
-    x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
-    nachfrage_pred = calls_demand_reg.predict(x_calls)
-    df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
-
-    return df2
-
 def actual_vs_pred(df3):
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -774,43 +954,6 @@ def future_predictions(AdaBoo, trend_reg, calls_demand_reg):
     actual_vs_pred(df3)
 
     return df3
-
-def s_sby_need(date):
-
-    date = [np.datetime64(date) for date in date]
-
-    # Regression für Notrufe
-    skop_reg = f'{current_directory}\\..\\Modeling\\model_linear_reg.scops'
-    reg_trend = sio.load(skop_reg, trusted=True)
-    startdate = np.datetime64('2016-04-01')
-    x = np.array((date-startdate).astype('timedelta64[D]') + np.timedelta64(1, 'D'))
-
-    # numpy array aus series date
-    x = x.reshape(-1, 1).astype(int)
-    reg_pred = reg_trend.predict(x).reshape(-1)
-
-    # Vorhersage des AdaBoost-Regressors
-    skop_adaboost = f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops'
-    model_adaboostreg = sio.load(skop_adaboost, trusted=True)
-    date_df = pd.DataFrame(date, columns=['date'])
-    df_pred = new_features(date_df)
-    df_pred_2 = df_pred[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    ada_pred = model_adaboostreg.predict(df_pred_2).reshape(-1)
-
-    # gesamte Vorhersage von Notrufen
-    pred = reg_pred + ada_pred
-
-    # Vorhersage der Nachfrage an Einsatzfahrenden
-    skop_demand = f'{current_directory}\\model_linear_reg_demand.skops'
-    model_demand = sio.load(skop_demand, trusted=True)
-    sby_plus_duty = model_demand.predict(pred.reshape(-1, 1))
-
-    # Subtrahieren von n_duty, vorausgestetzt n_duty ist 1900
-    sby_need = np.round(((sby_plus_duty - 1900).reshape(-1)), 0).astype(int)
-
-    sby_need_series = pd.Series(sby_need, index=date, name='sby_need_pred')
-
-    return sby_need_series
 
 def my_model_options(df):
 
@@ -836,8 +979,8 @@ def my_model_options(df):
     adabr.fit(X_train, y_train)
 
     # Persist das Modell mit skops
-    sio.dump(adabr, f'{current_directory}\\..\\Modeling\\model_adaboostreg.skops')
-    sio.dump(rf, f'{current_directory}\\..\\Modeling\\model_randomforestreg.skops')
+    sio.dump(adabr, f'{cd}\\..\\Modeling\\model_adaboostreg.skops')
+    sio.dump(rf, f'{cd}\\..\\Modeling\\model_randomforestreg.skops')
 
     # Sorted Feature Importance
     feature_gini_importance = pd.Series(rf.feature_importances_, index=X_train.columns)
@@ -882,7 +1025,7 @@ class NewCleanedData:
                          column_names_types: dict[str, str]
                          ) -> MyData:
         
-        my_raw_file_path = RawDataPath(raw_file_name).file_path
+        my_raw_file_path = _RawDataPath(raw_file_name).file_path
         df = pd.read_csv(my_raw_file_path, index_col=0, parse_dates=['date'])
         cleaning_notes = cls._quality_checks(df, column_names_types)
         df = df.astype(column_names_types)
@@ -1057,6 +1200,16 @@ class NewTransformedData:
 
 
 # archiv
+
+
+def adaboo_fut_predict(self):
+    """Vorhersage der Anzahl der Notrufe"""
+    df = future(self.df1)
+    miss_adaboost_pred = df['adaboost_pred'].isna() # Series mit True/False, ob Wert fehlt
+    features = df.loc[miss_adaboost_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
+    adaboost_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
+    df.loc[miss_adaboost_pred, 'adaboost_pred'] = adaboost_pred # Füge Vorhersage in df ein wo Wert fehlt
+    return df
 
 def features(df):
 
@@ -1316,3 +1469,20 @@ def make_df(self) -> None:
         
     note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
     self.df_build_notes.append(note)
+
+def demand_pred_final(df2, trend_reg, calls_demand_reg):
+
+    startdate = np.datetime64('2016-04-01')
+    x2 = np.array((df2['date']-startdate).dt.days + 1).reshape(-1, 1)
+    trend_2 = trend_reg.predict(x2)
+    calls_pred_2 = (np.round(trend_2, 0)).astype(int)
+    df2['calls_reg_pred_2'] = calls_pred_2.reshape(-1)
+
+    df2['reg_adaboost_pred'] = df2['calls_reg_pred_2'] + df2['adaboost_pred']
+
+    # Nachfrage basierend auf reg_adaboost_pred
+    x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
+    nachfrage_pred = calls_demand_reg.predict(x_calls)
+    df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
+
+    return df2
