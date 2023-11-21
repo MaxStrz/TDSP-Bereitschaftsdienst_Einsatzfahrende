@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
+import sklearn
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_validate
@@ -772,54 +773,195 @@ class VizualisedData:
         
         plt.show()
 
-# Kreuzvalidierung
+# Kreuzvalidierung bzw. Cross Validation bzw. CV
 
-def cross_val(model, X, y, cv):
-    results = cross_validate(
-        model, 
-        X,
-        y,
-        return_estimator=True,
-        cv=cv,
-        scoring=[
-            'neg_mean_squared_error',
-            'neg_root_mean_squared_error',
-            'neg_mean_absolute_error',
-            'r2'
-            ]
-    )
-    mse = -results['test_neg_mean_squared_error']
-    rmse = -results['test_neg_root_mean_squared_error']
-    mae = -results['test_neg_mean_absolute_error']
-    r2 = results['test_r2']
+class CrossValidatedModels:
 
-    # mean to 2 decimal places
-    msem = mse.mean().round(decimals=2)
-    rmsem = rmse.mean().round(decimals=2)
-    maem = mae.mean().round(decimals=2)
-    r2m = r2.mean().round(decimals=2)
-
-    # std to 2 decimal places
-    mse_std = mse.std().round(decimals=2)
-    rmse_std = rmse.std().round(decimals=2)
-    mae_std = mae.std().round(decimals=2)
-    r2_std = r2.std().round(decimals=2)
-
-    model_name = model.__class__.__name__
-
-    # define series index 
-    index = ['mse', 'rmse', 'mae', 'r2']
-
-    means = np.array([msem, rmsem, maem, r2m])
-    std = np.array([mse_std, rmse_std, mae_std, r2_std])
-
-    means = pd.Series(means, name=f'{model_name}_mean', 
-                      index=index, dtype='float64')
-
-    stds = pd.Series(std, name=f'{model_name}_std',
-                     index=index, dtype='float64')
+    def __init__(self) -> None:
+        kwargs = Config.dict_config
+        self.cls_featured_data = cls_fd = FeaturedData(**kwargs)
+        y = cls_fd.df_features['calls_reg_act_diff']
+        X = cls_fd.df_only_features
+        self.dict_params = dict_params = self._make_dict_params()
+        self.scoring = scoring = self._set_score_types()
+        tup_models = CrossValidatedModels._make_models(dict_params)
+        self.model_names = CrossValidatedModels._model_names(tup_models)
+        self.tscv = tscv = self._make_time_series_cv()
+        self.df_model_performance = self._model_cross_val(X, y, 
+                                                         tup_models, scoring,
+                                                         tscv)
+   
+    def _make_time_series_cv(self) -> TimeSeriesSplit:
+        tscv = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
+        return tscv
     
-    return means, stds
+    def _make_dict_params(self) -> dict[str, dict]:
+        dict_params = {
+            "rf": {"n_estimators": 100, "max_depth": 5, "random_state": 42},
+            "adabr": {"n_estimators": 100, "learning_rate": 1, 
+                      "random_state": 42},
+            "gradb": {"n_estimators": 100, "learning_rate": 1, 
+                      "random_state": 42},
+        }
+        return dict_params
+    
+    def _set_score_types(self) -> list[str]:
+        scoring = ['neg_mean_squared_error', 'neg_root_mean_squared_error',
+                   'neg_mean_absolute_error', 'r2']
+        return scoring
+    
+    @staticmethod
+    def _model_names(tup_models) -> list[str]:
+        model_names = []
+        for model in tup_models:
+            model_names.append(model.__class__.__name__)
+        return model_names
+
+    @staticmethod
+    def _make_models(dict_params: dict[str, dict]) -> tuple:
+
+        # Random Forest Regressor erstellen
+        rf = RandomForestRegressor(**dict_params['rf'])
+        adabr = AdaBoostRegressor(**dict_params['adabr']) # Teil des Basismodells
+        gradb = GradientBoostingRegressor(**dict_params['gradb'])
+
+        models = (rf, adabr, gradb)
+
+        return models
+
+    @staticmethod
+    def _model_cross_val(X: pd.DataFrame,
+                        y: pd.Series,
+                        models: tuple[sklearn.base.BaseEstimator],
+                        scoring: list[str],
+                        tscv: TimeSeriesSplit
+                        ) -> pd.DataFrame:
+
+        # Train/Test TimerSeriesSplit um ungefähr ein Jahr abzudecken
+        # Split funktioniert nicht genau wie in der eckten Welt
+        # test_size ist die Anzahl der Beobachtungen in jedem 
+        # Validierungsset.
+        # gap ist die Anzahl an Beobachtungen zwischen dem Trainings-
+        # und Validierungsset
+        # gap maximal 30 - 15 sein
+        # test_size mindestens 1 (31st) + 31 (Tage in langem Monat) sein
+
+        df_model_performance = pd.DataFrame()
+        
+        for model in models:
+            means, stds = CrossValidatedModels._cross_val(model, 
+                                                          X, 
+                                                          y, 
+                                                          tscv, 
+                                                          scoring)
+            
+            df_model_performance = pd.concat([df_model_performance, 
+                                              means, 
+                                              stds], 
+                                              axis=1)
+        
+        return df_model_performance
+
+    @staticmethod
+    def _cross_val(model, X, y, cv, scoring):
+        results = cross_validate(model, 
+                                 X,
+                                 y,
+                                 return_estimator=True,
+                                 cv=cv,
+                                 scoring=scoring
+                                 )
+        
+        mse = -results['test_neg_mean_squared_error']
+        rmse = -results['test_neg_root_mean_squared_error']
+        mae = -results['test_neg_mean_absolute_error']
+        r2 = results['test_r2']
+
+        # mean to 2 decimal places
+        msem = mse.mean().round(decimals=2)
+        rmsem = rmse.mean().round(decimals=2)
+        maem = mae.mean().round(decimals=2)
+        r2m = r2.mean().round(decimals=2)
+
+        # std to 2 decimal places
+        mse_std = mse.std().round(decimals=2)
+        rmse_std = rmse.std().round(decimals=2)
+        mae_std = mae.std().round(decimals=2)
+        r2_std = r2.std().round(decimals=2)
+
+        model_name = model.__class__.__name__
+
+        # define series index 
+        index = ['mse', 'rmse', 'mae', 'r2']
+
+        means = np.array([msem, rmsem, maem, r2m])
+        std = np.array([mse_std, rmse_std, mae_std, r2_std])
+
+        means = pd.Series(means, name=f'{model_name}_mean', 
+                          index=index, dtype='float64')
+
+        stds = pd.Series(std, name=f'{model_name}_std',
+                         index=index, dtype='float64')
+        
+        return means, stds
+
+# Grid Search Cross Validation bzw. GSCV
+
+class GSCVModels:
+    def __init__(self) -> None:
+        kwargs = Config.dict_config
+        self.cls_featured_data = cls_fd = FeaturedData(**kwargs)
+        y = cls_fd.df_features['calls_reg_act_diff']
+        X = cls_fd.df_only_features
+        self.dict_params = dict_params = self._make_dict_params()
+        self.scoring = scoring = self._set_score_types()
+        tup_models = CrossValidatedModels._make_models(dict_params)
+        self.model_names = CrossValidatedModels._model_names(tup_models)
+        self.tscv = tscv = self._make_time_series_cv()
+        self.df_model_performance = self._model_cross_val(X, y, 
+                                                        tup_models, scoring,
+                                                        tscv)
+
+    def adaboo_gscv(df):
+
+        # Merkmalsvariablen von Zielvariable trennen
+        X = df[['month', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
+        y = df['calls_reg_act_diff']
+
+        # Train/Test TimerSeriesSplit
+        tss = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
+
+        d_tree_crit = ['squared_error', 'friedman_mse', 
+                    'absolute_error']
+        
+        # Parameter für GridSearchCV
+        param_grid = {"n_estimators":[135, 140],
+                    #'learning_rate':[0.36, 0.35, 0.34],
+                    #"estimator__criterion":d_tree_crit,
+                    #"estimator__splitter":"best",
+                    #"estimator__max_depth":[2, 3, 4, 8],
+                    #"estimator__min_samples_split":[2, 5]
+                    }
+
+        # adaboost regressor erstellen
+        adabr = AdaBoostRegressor(estimator=DecisionTreeRegressor(), 
+                                random_state=42)
+        
+        adaboo_gscv = GridSearchCV(adabr, param_grid=param_grid, 
+                        scoring='neg_mean_squared_error', cv=tss)
+        
+        adaboo_gscv.fit(X, y)
+
+        # sort dataframe by rank_test_score
+        adaboo_gscv_df = pd.DataFrame(adaboo_gscv.cv_results_)
+        adaboo_gscv_df = adaboo_gscv_df.sort_values(by='rank_test_score')
+
+        df_to_append = pd.read_pickle('Code\\Analysis\\adaboo_gscv_df.pkl')
+        appended = pd.concat([df_to_append, adaboo_gscv_df], axis=0, sort=False)
+        appended.sort_values(by=['mean_test_score'], ascending=False)
+
+        # speichere das DataFrame als pickle
+        appended.to_pickle(f'{current_directory}\\adaboo_gscv_df.pkl')
 
 def ts_split_train(df):
 
@@ -856,80 +998,6 @@ def ts_split_train(df):
             val_dict[m.__class__.__name__].append(mse)
     
     print(pd.DataFrame(val_dict))
-
-def model_cross_val(df):
-
-    # Merkmalsvariablen von Zielvariable trennen
-    # df aber ohne die letzten 47 Zeilen
-    X = df[['month', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_reg_act_diff']
-
-    # Train/Test TimerSeriesSplit um ungefähr ein Jahr abzudecken
-    # Split funktioniert nicht genau wie in der eckten Welt
-    # test_size ist die Anzahl der Beobachtungen in jedem 
-    # Validierungsset.
-    # gap ist die Anzahl an Beobachtungen zwischen dem Trainings-
-    # und Validierungsset
-    # gap maximal 30 - 15 sein
-    # test_size mindestens 1 (31st) + 31 (Tage in langem Monat) sein
-    tscv = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
-
-    # Random Forest Regressor erstellen
-    rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
-    adabr = AdaBoostRegressor(n_estimators=100, random_state=42, learning_rate=1) # Teil des Basismodells
-    gradb = GradientBoostingRegressor(n_estimators=100, random_state=42, learning_rate=1)
-
-    models = (rf, adabr, gradb)
-
-    model_performance = pd.DataFrame()
-    for m in models:
-        means, stds = cross_val(m, X, y, tscv)
-        model_performance = pd.concat([model_performance, means, stds], axis=1)
-    
-    model_performance.to_pickle(f'{current_directory}\\model_performance_2.pkl')
-    model_performance.to_csv(f'{current_directory}\\model_performance_2.csv',
-                             sep=';', decimal=',')
-    
-def adaboo_gscv(df):
-
-    # Merkmalsvariablen von Zielvariable trennen
-    X = df[['month', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_reg_act_diff']
-
-    # Train/Test TimerSeriesSplit
-    tss = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
-
-    d_tree_crit = ['squared_error', 'friedman_mse', 
-                   'absolute_error']
-    
-    # Parameter für GridSearchCV
-    param_grid = {"n_estimators":[135, 140],
-                  #'learning_rate':[0.36, 0.35, 0.34],
-                  #"estimator__criterion":d_tree_crit,
-                  #"estimator__splitter":"best",
-                  #"estimator__max_depth":[2, 3, 4, 8],
-                  #"estimator__min_samples_split":[2, 5]
-                  }
-
-    # adaboost regressor erstellen
-    adabr = AdaBoostRegressor(estimator=DecisionTreeRegressor(), 
-                              random_state=42)
-    
-    adaboo_gscv = GridSearchCV(adabr, param_grid=param_grid, 
-                       scoring='neg_mean_squared_error', cv=tss)
-    
-    adaboo_gscv.fit(X, y)
-
-    # sort dataframe by rank_test_score
-    adaboo_gscv_df = pd.DataFrame(adaboo_gscv.cv_results_)
-    adaboo_gscv_df = adaboo_gscv_df.sort_values(by='rank_test_score')
-
-    df_to_append = pd.read_pickle('Code\\Analysis\\adaboo_gscv_df.pkl')
-    appended = pd.concat([df_to_append, adaboo_gscv_df], axis=0, sort=False)
-    appended.sort_values(by=['mean_test_score'], ascending=False)
-
-    # speichere das DataFrame als pickle
-    appended.to_pickle(f'{current_directory}\\adaboo_gscv_df.pkl')
 
 def actual_vs_pred(df3):
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -1011,7 +1079,7 @@ def my_model_options(df):
 
     return df, feature_gini_importance, results_df, models
 
-# new classes
+# ALternative Klassenstruktur
 
 class NewCleanedData:
 
@@ -1198,9 +1266,7 @@ class NewTransformedData:
     # self.arr_day = day.reshape(-1, 1)
     # self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
 
-
 # archiv
-
 
 def adaboo_fut_predict(self):
     """Vorhersage der Anzahl der Notrufe"""
