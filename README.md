@@ -9,10 +9,10 @@ Transformiere die Daten:
 Füge Features hinzu:  
 
 ### Modeling
-Modell-Kreuzvalidierung:
-Grid-Search-Kreuzvalidierung:
-Train und Test eines AdaBoost-Modell:
-Speichere das Vorhersagemodell mit MLFlow:
+Modell-Kreuzvalidierung:  
+Grid-Search-Kreuzvalidierung:  
+Train und Test eines AdaBoost-Modell:  
+Speichere das Vorhersagemodell mit MLFlow:  
 
 
 ## Weitere Dateien / Module
