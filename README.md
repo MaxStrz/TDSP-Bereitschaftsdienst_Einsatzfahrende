@@ -1,8 +1,18 @@
 "Vorhersage für den Bereitschaftsdienstplan" 
 
 ## How to use.
-Vorhersagen.ipynb Das ist der wichtigste Notebook. Man kann Daten in Form "2016-01-29" eingeben und eine Vorhersage der Notwendigen Einsatzfahrende in Bereitschaftsdienst zurück kriegen.
+Mache eine Vorhersage: Vorhersagen.ipynb - Das ist der wichtigste Notebook. Man kann Daten in Form "2016-01-29" eingeben und eine Vorhersage der Notwendigen Einsatzfahrende in Bereitschaftsdienst zurück kriegen.
 
+### Analysis
+Bereinige die Daten: 
+Transformiere die Daten:
+Füge Features hinzu:
+
+### Modeling
+Modell-Kreuzvalidierung:
+Grid-Search-Kreuzvalidierung:
+Train und Test eines AdaBoost-Modell:
+Speichere das Vorhersagemodell mit MLFlow:
 
 
 ## Weitere Dateien / Module
