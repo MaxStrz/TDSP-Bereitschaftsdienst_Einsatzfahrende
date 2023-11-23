@@ -1,4 +1,33 @@
- # TDSP Project Structure, and Documents and Artifact Templates
+"Vorhersage für den Bereitschaftsdienstplan" 
+
+## How to use.
+Vorhersagen.ipynb Das ist der wichtigste Notebook. Man kann Daten in Form "2016-01-29" eingeben und eine Vorhersage der Notwendigen Einsatzfahrende in Bereitschaftsdienst zurück kriegen.
+
+
+
+## Weitere Dateien / Module
+
+
+## TODO
+- Erklärebarkeit (Explainability) muss gemacht werden.
+- Vorhersagemodell sollte nicht mittels eines runs gelogged werden.
+- DataPrediction-Klasse und df_predict_sby_need-Methode muss aktualisiert werden, um es zu vereinfachen, das fertige Modell für Production zu verpacken.
+- dataPrep neu benennen. Vielleicht 'project_code'.
+- Config als json-Datei oder ähnlich statt Klasse in dataPrep.
+- 'Single source of truth' für Anzahl an Testtagen in dataPrep.
+- Konstruktoren sind oft zu groß. Verschiebe Logik zu Builders / Factorys.
+- dataPrep muss mit Docstrings und Kommentare besser dokumentiert sein.
+- Notebooks sollte mehr Aufbau/Prozesslogik übernehmen. Im Notebook Bereitschaftsdienstplan_Datentransformation beispielsweise erzeugt der Notebook bloß eine Klasseninstanz und ruft danach Attribute an. Die Transformationen selbst werden in dem Konstruktor ausgeführt, was möglicherweise nicht ideal ist, obwohl es macht es ganz klar, in welchem Zustand sich der DataFrame befindet.
+- Manche Methode der Klassen sollte private Methoden sein d.h. mit _ anfangen.
+- In der Bereinigungs, Transformations und Feature-Phasen, setzte DVC um.
+- status-Spalte wird nicht verwendet.
+- Weitere Versuche mit ARIMA und SARIMA-Modelle. Mindesten um die wichtigkeit von vorherigen Datenpunkten zu bestimmen.
+- Features zu probieren: Wert vom Jahr davor, Wert von 2., 3. usw. vorherigen Monat.
+
+## DOING
+
+
+# TDSP Project Structure, and Documents and Artifact Templates
 
 This is a general project directory structure for Team Data Science Process developed by Microsoft. It also contains templates for various documents that are recommended as part of executing a data science project when using TDSP. 
 
