@@ -1,0 +1,16 @@
+artifact_uri: mlflow-artifacts:/429532028009648294/c90a039013c74910ada98d354aa2b590/artifacts
+deleted_time: 1700744965928
+end_time: null
+entry_point_name: ''
+experiment_id: '429532028009648294'
+lifecycle_stage: deleted
+run_id: c90a039013c74910ada98d354aa2b590
+run_name: unequaled-conch-944
+run_uuid: c90a039013c74910ada98d354aa2b590
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1700744872530
+status: 1
+tags: []
+user_id: maxst

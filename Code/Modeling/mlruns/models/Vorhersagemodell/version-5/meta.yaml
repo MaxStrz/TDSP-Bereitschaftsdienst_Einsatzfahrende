@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1700731717713
+current_stage: None
+description: ''
+last_updated_timestamp: 1700731717713
+name: Vorhersagemodell
+run_id: fb888ac86657447a85a299ac3bb08b97
+run_link: ''
+source: mlflow-artifacts:/429532028009648294/fb888ac86657447a85a299ac3bb08b97/artifacts/bereitschaftsdienstplans
+status: READY
+status_message: null
+storage_location: mlflow-artifacts:/429532028009648294/fb888ac86657447a85a299ac3bb08b97/artifacts/bereitschaftsdienstplans
+user_id: null
+version: 5

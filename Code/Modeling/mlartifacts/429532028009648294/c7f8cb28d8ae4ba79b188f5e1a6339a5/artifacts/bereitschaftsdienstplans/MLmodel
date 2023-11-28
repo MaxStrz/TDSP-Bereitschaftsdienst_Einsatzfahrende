@@ -1,0 +1,15 @@
+artifact_path: bereitschaftsdienstplans
+flavors:
+  python_function:
+    cloudpickle_version: 2.2.1
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pyfunc.model
+    python_model: python_model.pkl
+    python_version: 3.10.2
+mlflow_version: 2.8.0
+model_size_bytes: 347102
+model_uuid: 1f364f17c2564b9084bfb38bc9a8370b
+run_id: c7f8cb28d8ae4ba79b188f5e1a6339a5
+utc_time_created: '2023-11-22 12:59:57.349490'

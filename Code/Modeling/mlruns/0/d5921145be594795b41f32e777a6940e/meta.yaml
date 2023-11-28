@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/0/d5921145be594795b41f32e777a6940e/artifacts
+end_time: 1700657784377
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: d5921145be594795b41f32e777a6940e
+run_name: calm-sponge-336
+run_uuid: d5921145be594795b41f32e777a6940e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1700656006504
+status: 3
+tags: []
+user_id: maxst

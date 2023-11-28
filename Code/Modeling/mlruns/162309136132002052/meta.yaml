@@ -1,0 +1,6 @@
+artifact_location: mlflow-artifacts:/162309136132002052
+creation_time: 1700644939220
+experiment_id: '162309136132002052'
+last_update_time: 1700644939220
+lifecycle_stage: active
+name: TrendRegression

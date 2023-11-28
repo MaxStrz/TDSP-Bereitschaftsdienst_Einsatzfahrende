@@ -1,0 +1,30 @@
+artifact_path: bereitschaftsdienstplans
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.10.2
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.3.1
+mlflow_version: 2.8.0
+model_size_bytes: 340645
+model_uuid: d7fa8a3f86474263947c7b4a2b8f0629
+run_id: b828d81370314067a87136834e9a854c
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  type: dataframe
+signature:
+  inputs: '[{"type": "integer", "name": "month"}, {"type": "integer", "name": "dayofmonth"},
+    {"type": "integer", "name": "weekday"}, {"type": "long", "name": "weekofyear"},
+    {"type": "integer", "name": "dayofyear"}, {"type": "integer", "name": "season"}]'
+  outputs: '[{"type": "double"}]'
+  params: null
+utc_time_created: '2023-11-24 11:52:42.389848'

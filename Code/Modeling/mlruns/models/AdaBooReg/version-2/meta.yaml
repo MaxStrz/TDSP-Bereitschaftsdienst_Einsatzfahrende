@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1700648399938
+current_stage: None
+description: ''
+last_updated_timestamp: 1700648399938
+name: AdaBooReg
+run_id: 2b28bf0350fb4428a3a644d344404ee3
+run_link: ''
+source: mlflow-artifacts:/434640519357902442/2b28bf0350fb4428a3a644d344404ee3/artifacts/bereitschaftsdienstplans
+status: READY
+status_message: null
+storage_location: mlflow-artifacts:/434640519357902442/2b28bf0350fb4428a3a644d344404ee3/artifacts/bereitschaftsdienstplans
+user_id: null
+version: 2

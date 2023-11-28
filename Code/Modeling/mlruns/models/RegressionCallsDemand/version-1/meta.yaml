@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1700663111939
+current_stage: None
+description: ''
+last_updated_timestamp: 1700663111939
+name: RegressionCallsDemand
+run_id: a15432a029e54a86bf9188524328cf3e
+run_link: ''
+source: mlflow-artifacts:/238431178062761885/a15432a029e54a86bf9188524328cf3e/artifacts/bereitschaftsdienstplans
+status: READY
+status_message: null
+storage_location: mlflow-artifacts:/238431178062761885/a15432a029e54a86bf9188524328cf3e/artifacts/bereitschaftsdienstplans
+user_id: null
+version: 1

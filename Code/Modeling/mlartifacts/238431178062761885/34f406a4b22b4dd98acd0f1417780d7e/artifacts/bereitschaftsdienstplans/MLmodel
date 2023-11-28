@@ -1,0 +1,20 @@
+artifact_path: bereitschaftsdienstplans
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.10.2
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.3.1
+mlflow_version: 2.8.0
+model_size_bytes: 429
+model_uuid: 5f52caa7aa9a41729e10035231f1feaf
+run_id: 34f406a4b22b4dd98acd0f1417780d7e
+utc_time_created: '2023-11-23 13:47:29.923448'

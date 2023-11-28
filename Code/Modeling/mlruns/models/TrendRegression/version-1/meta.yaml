@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1700659723640
+current_stage: None
+description: ''
+last_updated_timestamp: 1700659723640
+name: TrendRegression
+run_id: a5493128de1643078f5731062cf58431
+run_link: ''
+source: mlflow-artifacts:/162309136132002052/a5493128de1643078f5731062cf58431/artifacts/bereitschaftsdienstplans
+status: READY
+status_message: null
+storage_location: mlflow-artifacts:/162309136132002052/a5493128de1643078f5731062cf58431/artifacts/bereitschaftsdienstplans
+user_id: null
+version: 1

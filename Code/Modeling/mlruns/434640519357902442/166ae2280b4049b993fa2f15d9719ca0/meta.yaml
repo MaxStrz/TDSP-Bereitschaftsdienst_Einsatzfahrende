@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/434640519357902442/166ae2280b4049b993fa2f15d9719ca0/artifacts
+end_time: 1700657852809
+entry_point_name: ''
+experiment_id: '434640519357902442'
+lifecycle_stage: active
+run_id: 166ae2280b4049b993fa2f15d9719ca0
+run_name: AdaBooReg_20231122-1357
+run_uuid: 166ae2280b4049b993fa2f15d9719ca0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1700657847556
+status: 3
+tags: []
+user_id: maxst

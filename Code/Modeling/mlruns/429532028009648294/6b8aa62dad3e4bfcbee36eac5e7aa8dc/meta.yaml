@@ -1,0 +1,15 @@
+artifact_uri: mlflow-artifacts:/429532028009648294/6b8aa62dad3e4bfcbee36eac5e7aa8dc/artifacts
+end_time: 1700745118844
+entry_point_name: ''
+experiment_id: '429532028009648294'
+lifecycle_stage: active
+run_id: 6b8aa62dad3e4bfcbee36eac5e7aa8dc
+run_name: '4'
+run_uuid: 6b8aa62dad3e4bfcbee36eac5e7aa8dc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1700745113496
+status: 3
+tags: []
+user_id: maxst

@@ -1,0 +1,11 @@
+digest: 3e1d8ee1
+name: dataset
+profile: '{"num_rows": 1152, "num_elements": 10368}'
+schema: '{"mlflow_colspec": [{"type": "integer", "name": "month"}, {"type": "integer",
+  "name": "dayofmonth"}, {"type": "integer", "name": "weekday"}, {"type": "long",
+  "name": "weekofyear"}, {"type": "integer", "name": "dayofyear"}, {"type": "integer",
+  "name": "season"}, {"type": "datetime", "name": "date"}, {"type": "integer", "name":
+  "calls_reg_act_diff"}, {"type": "integer", "name": "predictions"}]}'
+source: '{"tags": {"mlflow.user": "maxst", "mlflow.source.name": "C:\\Users\\maxst\\Dropbox\\Weiterbildung\\IU\\Mods\\FsME\\Prog\\TDSP-BsdEf\\BsdEf_venv\\lib\\site-packages\\ipykernel_launcher.py",
+  "mlflow.source.type": "LOCAL"}}'
+source_type: code
