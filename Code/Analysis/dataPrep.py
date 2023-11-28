@@ -1,6 +1,3 @@
-from __future__ import annotations
-import featuretools as ft
-from featuretools.primitives import Lag, RollingMin, RollingMean
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np  
@@ -9,32 +6,42 @@ import pandas as pd
 from pandas.tseries.offsets import DateOffset
 import sklearn
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
-import skops.io as sio
 from statsmodels.tsa.seasonal import seasonal_decompose
-import sys
 import warnings
 
-# ignoriere FutureWarnings
-warnings.simplefilter(action='ignore', category=(FutureWarning, pd.errors.PerformanceWarning))
+# ignore FutureWarnings
+warnings.simplefilter(action='ignore',
+                      category=(FutureWarning, pd.errors.PerformanceWarning))
 
-# absolute dir in dem das Skript ist
-current_directory = os.path.dirname(__file__)
-cd = os.path.dirname(__file__) # absolute dir in dem das Skript ist
-relative_path_to_raw_folder = "../../Sample_Data/Raw/"
-relative_path_to_models_folder = "../Modeling"
-path_to_raw_folder = os.path.join(cd, relative_path_to_raw_folder)
-path_to_models_folder = os.path.join(cd, relative_path_to_models_folder)
+cd = os.path.dirname(__file__) # absolute dir the script is in
+relative_path_to_folder_data_raw = "../../Data/Raw/"
+relative_path_to_folder_modeling = "../Modeling"
+path_to_folder_data_raw = os.path.join(cd, relative_path_to_folder_data_raw)
+path_to_folder_modeling = os.path.join(cd, relative_path_to_folder_modeling)
 
-# Configuration
+# Konfigurationen
 class Config:
+    """
+    Erstelle ein Dictionary mit Konfigurationen für die Daten und Features.   
+    
+    Attributes
+    ----------
+    _my_file_name : str 
+        Name der CSV-Datei mit den Daten
+    _column_names_types : dict[str, str]
+        Dictionary mit Spaltennamen und Datentypen
+    _features : tuple[str]
+        Tuple mit Features für die Vorhersage
+    dict_config : dict[str, any]
+        Dictionary mit Konfiguration für die Daten und Features
+    """
+
     _my_file_name = 'sickness_table.csv'
     
     _column_names_types = {'date': 'datetime64[ns]', 
@@ -54,25 +61,83 @@ class Config:
                    'features':_features,
                    }
 
-# Arrays für die Modelle
+# Kleine Daten Transformationen
 class TransformedDataArrays:
-    def __init__(self,
-                 df: pd.DataFrame,
-                 test_days: int=47
-                 ) -> None:
+    """
+    Stelle DataFrame-Spalten und Series als Arrays für Modelle bereit.
+
+    Attributes
+    ----------
+    arr_calls : np.ndarray
+        Array der Spalte 'calls'
+    arr_day : np.ndarray
+        Array der Spalte 'day' beginnend mit 1
+    arr_day_test : np.ndarray
+        Array der Spalte 'day' für Testdaten
+    """
+
+    def __init__(self, df: pd.DataFrame, test_days: int=47) -> None:
+        """
+        Parameters
+        ----------
+        df : DataFrame
+            DataFrame mit Spalten 'calls' und 'day'
+        test_days : int, optional
+            Anzahl der Tage für Testdaten
+
+        Returns
+        -------
+        None.
+
+        """
+        
         self.arr_calls = np.array(df['calls']).reshape(-1, 1)
         self.arr_day = np.array(df['day']).reshape(-1, 1)
         self.arr_day_test = np.array(df['day'][-test_days:]).reshape(-1, 1)
 
 class TrainValTestData:
+    """
+    Stelle Daten für Trainings-, Validierungs- und Testdaten bereit.
+
+    Attributes
+    ----------
+    X : pd.DataFrame
+        DataFrame mit nur Features
+    y : pd.Series
+        Series mit nur Zielvariable 'calls_reg_act_diff'
+    X_train_val : pd.DataFrame
+        DataFrame mit nur Features für Trainings- und Validierungsdaten
+    y_train_val : pd.Series
+        Series mit nur Zielvariable 'calls_reg_act_diff' für Train und Val
+    X_test : pd.DataFrame
+        DataFrame mit nur Features für Testdaten
+    y_test : pd.Series
+        Series mit nur Zielvariable 'calls_reg_act_diff' für Testdaten
+    """
 
     def __init__(self, 
                  df_features: pd.DataFrame,
                  s_target: pd.Series,
-                 features: tuple(str),
+                 features: tuple[str],
                  test_days: int=47,
                  ) -> None:
-        
+        """
+        Parameters
+        ----------
+        df_features : pd.DataFrame
+            DataFrame mit mindestens alle Features
+        s_target : pd.Series
+            Series mit Zielvariable 'calls_reg_act_diff'
+        features : tuple[str]
+            Tuple der Features für die Vorhersage
+        test_days : int, optional
+            Anzahl der Tage für Testdaten
+
+        Returns
+        -------
+        None.
+        """
+
         self.X = df_features[list(features)]
         self.y = s_target
         self.X_train_val = self.X[:-test_days]
@@ -81,7 +146,6 @@ class TrainValTestData:
         self.y_test = self.y[-test_days:]
 
 # Modelle
-
 class RegressionCallsDemand:
 
     def __init__(self, 
@@ -94,9 +158,6 @@ class RegressionCallsDemand:
         self.model_ftd_reg_calls_demand = model_ftd = self.fit(X, y)
         self.mode_scr_reg_calls_demand = self.score(model_ftd, X, y)
         self.arr_pred_demand = self.pred_calls_demand(model_ftd, calls)
-        self.save_model_skops('model_linear_reg_demand.skops', 
-                              model_ftd,
-                              path_to_models_folder)
 
         
     @staticmethod    
@@ -121,15 +182,6 @@ class RegressionCallsDemand:
         pred_demand = fitted_model.predict(X)
         pred_demand = np.round(pred_demand, 0).astype(int)
         return pred_demand
-    
-    @staticmethod
-    def save_model_skops(file_name: str,
-                         model,
-                         folder_path: str=cd
-                         ) -> None:
-        
-        file_path = os.path.join(folder_path, file_name)
-        sio.dump(model, file_path)
 
 class DataTrend:
     def __init__(self,
@@ -140,20 +192,8 @@ class DataTrend:
         y = self.arrays.arr_calls
         self.model_ftd = LinearRegression().fit(X, y)
         self.trend_score = self.model_ftd.score(X, y)
-        self.save_model = self.save_model_skops('model_linear_reg_trend.skops',
-                                                self.model_ftd,
-                                                path_to_models_folder)
         self.calls_reg_pred = self.pred_trend(self.model_ftd, X)
         self.calls_reg_act_diff = self.detrend(df, self.calls_reg_pred)
-    
-    @staticmethod
-    def save_model_skops(file_name: str,
-                         model,
-                         folder_path: str=cd
-                         ) -> None:
-        
-        file_path = os.path.join(folder_path, file_name)
-        sio.dump(model, file_path)
     
     @staticmethod
     def pred_trend(model_ftd: LinearRegression,
@@ -221,7 +261,7 @@ class AdaBooReg:
         metrics = {'mse':mse, 'r2':r2}
         return metrics
 
-# Data 
+# Daten bereinigen und transformieren und Features hinzufügen
 class _KwargsNotUsed:
     def __init__(self, **kwargs) -> None:
         self.not_used_kwargs = kwargs
@@ -232,7 +272,7 @@ class _RawDataPath(_KwargsNotUsed):
                  **kwargs
                  ) -> None:
         super().__init__(**kwargs)
-        self.file_path = os.path.join(path_to_raw_folder, my_file_name)
+        self.file_path = os.path.join(path_to_folder_data_raw, my_file_name)
         print(f"Pfad zur CSV-Datei: {my_file_name} erstellt.")
 
 class CleanedData(_RawDataPath):
@@ -242,7 +282,7 @@ class CleanedData(_RawDataPath):
                  ) -> None:
         
         super().__init__(**kwargs)
-        self.df_build_notes = []
+        self.df_build_notes = ['Daten bereinigen \n-----------------']
         self.column_names_types = column_names_types
         self.column_names = column_names_types.keys()
         self.column_types = column_names_types.values()
@@ -390,8 +430,6 @@ class CleanedData(_RawDataPath):
     def _df_summary(self, df: pd.DataFrame) -> None:
             """Gibt eine Zusammenfassung des DataFrames aus"""
 
-            df.describe().to_csv(f"{cd}\\df_description.csv",
-                                      sep=';', decimal=',')
             summary_list = []
             summary_list.append("\nDataframe Info:")
             summary_list.append(df.describe())
@@ -408,6 +446,7 @@ class TransformedData(CleanedData):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.startdate = sd = np.datetime64('2016-04-01')
+        self.df_build_notes.append('\nDaten tranformieren\n-----------------')
         self.df_tformed = self.df_cleaned.copy()
         self.df_tformed['day'] = (self.df_cleaned['date']-sd).dt.days + 1
         self.df_tformed = self.create_demand(self.df_tformed)
@@ -415,7 +454,11 @@ class TransformedData(CleanedData):
         self.df_tformed = self.predict_past_demand(self.df_tformed)
         self.trend_reg = t = DataTrend(self.df_tformed)
         self.df_tformed['calls_reg_pred'] = t.calls_reg_pred
+        note = "Erfolgreich: Spalte 'calls_reg_pred' erstellt"
+        self.df_build_notes.append(note)
         self.df_tformed['calls_reg_act_diff'] = t.calls_reg_act_diff
+        note = "Erfolgreich: Spalte 'calls_reg_act_diff' erstellt"
+        self.df_build_notes.append(note)
         print("Daten transformiert")
 
     def create_demand(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -447,7 +490,6 @@ class TransformedData(CleanedData):
                             df: pd.DataFrame
                             ) -> pd.DataFrame:
         df['demand_pred'] = RegressionCallsDemand(df).arr_pred_demand
-        
         note = "Erfolgreich: Spalte 'demand_pred' erstellt"
         self.df_build_notes.append(note)
 
@@ -458,6 +500,7 @@ class FeaturedData(TransformedData):
                  features: tuple[str, ...], 
                  **kwargs) -> None:
         super().__init__(**kwargs)
+        self.df_build_notes.append('\nFeatured erstellen\n-----------------')
         self.tup_features = features
         self.df_features = self.add_date_features(self.df_tformed,
                                                   self.tup_features)
@@ -466,7 +509,7 @@ class FeaturedData(TransformedData):
     
     def add_date_features(self,
                              df: pd.DataFrame,
-                             features: tuple(str),
+                             features: tuple[str],
                              date_column_name: str='date',
                              ) -> None:
         df_features = df.copy()
@@ -515,6 +558,17 @@ class FeaturedData(TransformedData):
 
         return df_features
 
+    def vor_364(self) -> pd.DataFrame:
+        df = self.df_features[['date', 'calls_reg_act_diff']].copy()
+        df_1 = df.copy()
+        df_1.rename(columns={'date':'date_vor_364', 'calls_reg_act_diff':'calls_rad_vor_364'}, inplace=True)
+        df['date_vor_364'] = self.df_features['date'] - pd.Timedelta(days=364)
+        df = pd.merge(df, df_1, on='date_vor_364', how='left')
+        df.set_index('date', inplace=True)
+        df.dropna(subset=['calls_rad_vor_364'], inplace=True)
+
+        return df
+
 # Vorhersagen
 class DataPrediction(FeaturedData):
 
@@ -530,7 +584,10 @@ class DataPrediction(FeaturedData):
         self.model_adabooreg = mab = self._make_adabooreg(self.train_val_test)
         self.pred_reg_calls = self._reg_pred().reshape(-1)
         self.final_ada_pred = mab.adabooreg_pred_all + self.pred_reg_calls
-        self.df_pred['adabooreg_reg_calls_pred'] = self.final_ada_pred
+        self.df_pred['adabooreg_reg_calls_pred'] = pred = self.final_ada_pred
+        self.df_pred['adabooreg_error'] = pred - self.df_pred['calls']
+        sby_need_pred = self.df_predict_sby_need(self.df_pred['date'])
+        self.df_pred['adabooreg_sby_need'] = sby_need_pred['sby_need_pred']
         
     @staticmethod
     def _make_adabooreg(data: TrainValTestData) -> AdaBooReg:
@@ -547,12 +604,12 @@ class DataPrediction(FeaturedData):
 
     @staticmethod
     def _date_list_in_reg_out(date: list['datetime64'],
-                                startdate: 'datetime64'
+                              startdate: 'datetime64',
+                              df_pred: pd.DataFrame
                                 ) -> np.array:
 
         # Regression für Notrufe
-        skop_reg = f'{cd}\\..\\Modeling\\model_linear_reg.scops'
-        reg_trend = sio.load(skop_reg, trusted=True)
+        reg_trend = DataTrend(df_pred).model_ftd
         x = np.array((date-startdate).astype('timedelta64[D]') + \
                     np.timedelta64(1, 'D'))
 
@@ -569,11 +626,10 @@ class DataPrediction(FeaturedData):
         date = [np.datetime64(date) for date in date]
 
         calls_reg_pred = DataPrediction._date_list_in_reg_out(date, 
-                                                              self.startdate)
+                                                              self.startdate,
+                                                              self.df_pred)
 
         # Vorhersage des AdaBoost-Regressors
-        #skop_adaboost = f'{cd}\\..\\Modeling\\model_adaboostreg.skops'
-        #model_adaboostreg = sio.load(skop_adaboost, trusted=True)
         df_date = pd.DataFrame(date, columns=['date'])
         df_pred = self.add_date_features(df_date, self.tup_features)
         df_pred_2 = df_pred[list(self.tup_features)]
@@ -583,22 +639,19 @@ class DataPrediction(FeaturedData):
         pred = calls_reg_pred + adabooreg_pred
 
         # Vorhersage der Nachfrage an Einsatzfahrenden
-        skop_demand = f'{cd}\\model_linear_reg_demand.skops'
-        model_demand = sio.load(skop_demand, trusted=True)
-        sby_plus_duty = model_demand.predict(pred.reshape(-1, 1))
+        model_reg = RegressionCallsDemand(self.df_pred)
+        model_reg_fitted = model_reg.model_ftd_reg_calls_demand
+        sby_plus_duty = model_reg_fitted.predict(pred.reshape(-1, 1))
 
         # Subtrahieren von n_duty, vorausgestetzt n_duty ist 1900
-        sby_need = np.round(((sby_plus_duty - 1900).reshape(-1)), 0).astype(int)
 
-        sby_need_series = pd.Series(sby_need, index=date, name='sby_need_pred')
+        sby_need_1900 = np.round(((sby_plus_duty - 1900).reshape(-1)), 0).astype(int)
 
-        s_sby_need = pd.Series(sby_need, name='sby_need_pred')
-        s_adabooreg_pred = pd.Series(adabooreg_pred, name='adabooreg_pred')
-        s_calls_reg_pred = pd.Series(calls_reg_pred, name='calls_reg_pred')
+        s_sby_need = pd.Series(sby_need_1900, name='sby_need_pred')
 
-        df_pred = pd.concat([df_pred['date'], s_sby_need], axis=1)
+        df = pd.concat([df_pred['date'], s_sby_need], axis=1)
 
-        return df_pred
+        return df
 
 # Visualisierungen
 class VizualisedData:
@@ -615,12 +668,13 @@ class VizualisedData:
         ax.set_xlabel('Anzahl der Notrufe')
         ax.set_ylabel('Gesamtnachfrage')
         # Zeige das Diagramm
-        plt.savefig(f'{cd}\\demand_vs_calls.jpg')
+        plt.savefig(f'{cd}\\abbildungen\\demand_vs_calls.jpg')
 
     def overview_scatter(self) -> None:
 
         # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
         fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, sharex=True, figsize=(10, 10))
+        
         ax1.scatter(self.df['date'], self.df['calls'], s=3)
         ax2.scatter(self.df['date'], self.df['n_sick'], s=3)
         ax3.scatter(self.df['date'], self.df['sby_need'], s=3)
@@ -661,7 +715,7 @@ class VizualisedData:
             ax.set_ylim(top=ax.get_ylim()[1]*1.05)
 
         # Speichere das Diagramm
-        to_save_fig = f'{cd}\\overview_scatter.jpg'
+        to_save_fig = f'{cd}\\abbildungen\\overview_scatter.jpg'
         plt.savefig(to_save_fig)
 
     def plot_notruf_reg(self) -> None:
@@ -670,7 +724,7 @@ class VizualisedData:
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.scatter(self.df['date'], self.df['calls'], s=3)
         ax.plot(self.df['date'], self.df['calls_reg_pred'], color='red')
-        plt.savefig(f'{cd}\\notruf_reg.jpg')
+        plt.savefig(f'{cd}\\abbildungen\\notruf_reg.jpg')
 
     def no_trend_scatter(self) -> None:
         # Erstelle das Streuungsdiagramm erneut mit modifizierten Beschriftungen für die x-Achse
@@ -711,27 +765,30 @@ class VizualisedData:
             ax.set_ylim(top=ax.get_ylim()[1]+500)
 
         # Speichere das Diagramm
-        to_save_fig = f'{cd}\\no_trend_scatter.jpg'
+        to_save_fig = f'{cd}\\abbildungen\\no_trend_scatter.jpg'
         plt.savefig(to_save_fig)
 
-    def actual_vs_pred(self):
+    def scatter_compare(self, column_name_1, column_name_2, title) -> None:
         fig, ax = plt.subplots(figsize=(10, 5))
 
         ax.scatter(self.df['date'], 
-                   self.df['demand_pred'], 
+                   self.df[column_name_1], 
                    s=3, 
-                   color='blue')
+                   color='lightgrey',
+                   label=column_name_1)
         
         ax.scatter(self.df['date'], 
-                   self.df['nachfrage_pred'],
-                   s=3, 
-                   color='red')
+                   self.df[column_name_2],
+                   s=3,
+                   label=column_name_2)
 
-        ax.set_title('Actual vs. Predicted Demand')
+        ax.legend()
+
+        ax.set_title(title)
         ax.set_xlabel('Date')
-        ax.set_ylabel('Demand')
+        ax.set_ylabel('Stationäre Nachfrage')
 
-        plt.savefig(f'{cd}\\demand_vs_adaboo.jpg')
+        plt.savefig(f'{cd}\\abbildungen\\demand_vs_adaboo.jpg')
     
     def scat_act_pred(self):
         # Erstelle ein Streuungsdiagramm mit 'date' auf der 
@@ -751,30 +808,45 @@ class VizualisedData:
         plt.show()
 
     def plot_train_test(self):
-        fig, (ax_1, ax_2, ax_3) = plt.subplots(3, 
-                                               1, 
-                                               sharex=True, 
-                                               figsize=(10, 8))
-        date = self.df['date']
-        y_1 = self.df['calls_reg_act_diff']
-        y_2 = self.df['randforest_pred']
-        y_3 = self.df['adaboost_pred']
+        fig, (ax_1, ax_2, ax_3, ax_4, ax_5, ax_6) = plt.subplots(6, 1, sharex=True, figsize=(10, 16))
+        test_days = 47
+        date = self.df['date'][-test_days:]
+        y_1 = self.df['calls'][-test_days:]
+        y_2 = self.df['adabooreg_reg_calls_pred'][-test_days:]
+        y_3 = self.df['adabooreg_error'][-test_days:]
+        ada = self.df['adabooreg_sby_need'][-test_days:]
+        y_4 = np.where(ada > 0, ada, 0)
+        y_5 = self.df['sby_need'][-test_days:]
+        y_6 = y_4 - y_5
+
+        # Horizontalen Linien wo sby_needed > 0
+        ax_1.axhline(y=9500, color='red', linestyle='--', label='sby_needed')
+        ax_2.axhline(y=9500, color='red', linestyle='--')
+
+        ax_1.legend()
+
         # Beide y-Achsen in einem figure als Streuungsdiagramme mit kleinen Punkten
-        ax_1.scatter(date, y_1, color='red', marker='.')
+        ax_1.scatter(date, y_1, color='blue', marker='.')
         ax_2.scatter(date, y_2, color='blue', marker='.')
-        ax_3.scatter(date, y_3, color='green', marker='.')
+        ax_3.scatter(date, y_3, color=np.where(y_3 >= 0, 'blue', 'red'), marker='.')
+        ax_4.scatter(date, y_4, color='blue', marker='.')
+        ax_5.scatter(date, y_5, color='red', marker='.')
+        ax_6.scatter(date, y_6, color=np.where(y_6 >= 0, 'blue', 'red'), marker='.')
+
         # Achsenbeschriftung
-        ax_1.set_xlabel('Datum')
-        ax_1.set_ylabel('Calls_reg_act_diff')
-        ax_2.set_ylabel('randforest_pred')
-        ax_3.set_ylabel('adaboost_pred')
+        ax_6.set_xlabel('Datum')
+        ax_1.set_ylabel('Calls')
+        ax_2.set_ylabel('Predicted Calls')
+        ax_3.set_ylabel('Predicted Calls - Calls')
+        ax_4.set_ylabel('Predicted sby_need')
+        ax_5.set_ylabel('Actual sby_need')
+        ax_6.set_ylabel('Predicted - actual sby_need')
         
-        ax_1.set_title('Calls_reg_act_diff und Predictions')
+        plt.savefig(f'{cd}\\abbildungen\\plot_train_test.jpg')
         
         plt.show()
 
 # Kreuzvalidierung bzw. Cross Validation bzw. CV
-
 class CrossValidatedModels:
 
     def __init__(self) -> None:
@@ -786,14 +858,14 @@ class CrossValidatedModels:
         self.scoring = scoring = self._set_score_types()
         tup_models = CrossValidatedModels._make_models(dict_params)
         self.model_names = CrossValidatedModels._model_names(tup_models)
-        self.tscv = tscv = self._make_time_series_cv()
+        self.tss = tss = self._make_time_series_split()
         self.df_model_performance = self._model_cross_val(X, y, 
                                                          tup_models, scoring,
-                                                         tscv)
+                                                         tss)
    
-    def _make_time_series_cv(self) -> TimeSeriesSplit:
-        tscv = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
-        return tscv
+    def _make_time_series_split(self) -> TimeSeriesSplit:
+        tss = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
+        return tss
     
     def _make_dict_params(self) -> dict[str, dict]:
         dict_params = {
@@ -906,49 +978,35 @@ class CrossValidatedModels:
         return means, stds
 
 # Grid Search Cross Validation bzw. GSCV
-
 class GSCVModels:
-    def __init__(self) -> None:
-        kwargs = Config.dict_config
-        self.cls_featured_data = cls_fd = FeaturedData(**kwargs)
+    def __init__(self,
+                 tss,
+                 dict_param_grid,
+                 df_gscv_new_results,
+                 df_gscv_all_results,
+                 scoring
+                 ) -> None:
+        self.tss = tss
+        self.dict_param_grid = dict_param_grid
+        self.df_gscv_new_results = df_gscv_new_results
+        self.df_gscv_all_results = df_gscv_all_results
+        self.scoring = scoring
+
+    @classmethod
+    def run_adabooreg_gscv(cls, tss, param_grid):
+
+        #kwargs = Config.dict_config
+        cls_featured_data = cls_fd = FeaturedData(**(Config.dict_config))
         y = cls_fd.df_features['calls_reg_act_diff']
         X = cls_fd.df_only_features
-        self.dict_params = dict_params = self._make_dict_params()
-        self.scoring = scoring = self._set_score_types()
-        tup_models = CrossValidatedModels._make_models(dict_params)
-        self.model_names = CrossValidatedModels._model_names(tup_models)
-        self.tscv = tscv = self._make_time_series_cv()
-        self.df_model_performance = self._model_cross_val(X, y, 
-                                                        tup_models, scoring,
-                                                        tscv)
-
-    def adaboo_gscv(df):
-
-        # Merkmalsvariablen von Zielvariable trennen
-        X = df[['month', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-        y = df['calls_reg_act_diff']
-
-        # Train/Test TimerSeriesSplit
-        tss = TimeSeriesSplit(n_splits=7, test_size=32, gap=15)
-
-        d_tree_crit = ['squared_error', 'friedman_mse', 
-                    'absolute_error']
-        
-        # Parameter für GridSearchCV
-        param_grid = {"n_estimators":[135, 140],
-                    #'learning_rate':[0.36, 0.35, 0.34],
-                    #"estimator__criterion":d_tree_crit,
-                    #"estimator__splitter":"best",
-                    #"estimator__max_depth":[2, 3, 4, 8],
-                    #"estimator__min_samples_split":[2, 5]
-                    }
 
         # adaboost regressor erstellen
         adabr = AdaBoostRegressor(estimator=DecisionTreeRegressor(), 
                                 random_state=42)
         
+        scoring = 'neg_mean_squared_error'
         adaboo_gscv = GridSearchCV(adabr, param_grid=param_grid, 
-                        scoring='neg_mean_squared_error', cv=tss)
+                        scoring=scoring, cv=tss)
         
         adaboo_gscv.fit(X, y)
 
@@ -956,599 +1014,20 @@ class GSCVModels:
         adaboo_gscv_df = pd.DataFrame(adaboo_gscv.cv_results_)
         adaboo_gscv_df = adaboo_gscv_df.sort_values(by='rank_test_score')
 
-        df_to_append = pd.read_pickle('Code\\Analysis\\adaboo_gscv_df.pkl')
-        appended = pd.concat([df_to_append, adaboo_gscv_df], axis=0, sort=False)
-        appended.sort_values(by=['mean_test_score'], ascending=False)
+        df_to_append = pd.read_pickle(f'{cd}\\df_adaboo_gscv.pkl')
+        appended = pd.concat([df_to_append, adaboo_gscv_df], axis=0, 
+                             ignore_index=True, sort=False)
 
+        appended.sort_values(by=['mean_test_score'], ascending=False, 
+                             ignore_index=True)
+        
         # speichere das DataFrame als pickle
-        appended.to_pickle(f'{current_directory}\\adaboo_gscv_df.pkl')
-
-def ts_split_train(df):
-
-    # Merkmalsvariablen von Zielvariable trennen
-    X = df[['month', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_reg_act_diff']
-
-    # Train/Test TimerSeriesSplit
-    tss = TimeSeriesSplit(n_splits=3, test_size=32, gap=15)
-
-    # adaboost regressor erstellen
-    adabr = AdaBoostRegressor(random_state=42)
-        
-    # Random Forest Regressor erstellen
-    rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
-    adabr = AdaBoostRegressor(n_estimators=100, random_state=42, learning_rate=1) # Teil des Basismodells
-    models = (rf, adabr)
-
-    # Leere Dictionary für die Ergebnisse
-    val_dict = {}
-
-    # Trainiere das Modell auf Trainingsdaten
-    for m in models:
-        val_dict[m.__class__.__name__] = []
-        for train_index, test_index in tss.split(X):
-            X_train, X_test = X.iloc[train_index], X.iloc[test_index]
-            y_train, y_test = y.iloc[train_index], y.iloc[test_index]
-
-            m.fit(X_train, y_train)
-
-            y_pred = m.predict(X_test)
-            mse = mean_squared_error(y_test, y_pred)
-
-            val_dict[m.__class__.__name__].append(mse)
-    
-    print(pd.DataFrame(val_dict))
-
-def actual_vs_pred(df3):
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.scatter(df3['date'], df3['demand_pred'], s=3, color='blue')
-    ax.scatter(df3['date'], df3['nachfrage_pred'], s=3, color='red')
-
-    ax.set_title('Actual vs. Predicted Demand')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Demand')
-
-    plt.savefig(f'{current_directory}\\demand_vs_adaboo.jpg')
-
-def future_predictions(AdaBoo, trend_reg, calls_demand_reg):
-
-    df2 = AdaBoo.df2
-
-    df3 = demand_pred_final(df2, trend_reg, calls_demand_reg)
- 
-    df3['sby_pred'] = df3['nachfrage_pred'] - df3['n_duty']
-
-    actual_vs_pred(df3)
-
-    return df3
-
-def my_model_options(df):
-
-    # Merkmalsvariablen von Zielvariable trennen
-    X = df[['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']]
-    y = df['calls_reg_act_diff']
-    X_train = X[:-47]
-    y_train = y[:-47]
-    X_test = X[-47:]
-    y_test = y[-47:]
-
-    # Random Forest Regressor erstellen
-    rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
-
-    estimator = DecisionTreeRegressor(max_depth=5, min_samples_split=3)
-    adabr = AdaBoostRegressor(estimator=estimator,
-                              n_estimators=130, 
-                              random_state=42, 
-                              learning_rate=0.36)
-    models = [rf, adabr]
-
-    rf.fit(X_train, y_train)
-    adabr.fit(X_train, y_train)
-
-    # Persist das Modell mit skops
-    sio.dump(adabr, f'{cd}\\..\\Modeling\\model_adaboostreg.skops')
-    sio.dump(rf, f'{cd}\\..\\Modeling\\model_randomforestreg.skops')
-
-    # Sorted Feature Importance
-    feature_gini_importance = pd.Series(rf.feature_importances_, index=X_train.columns)
-
-    # Vorhersagen auf Testdaten
-    predictions_rf = rf.predict(X_test)
-    predictions_adabr = adabr.predict(X_test)
-
-    # Series der Vorhersagen aller X-Werte
-    full_pred_rf = rf.predict(X)
-    full_pred_adabr = adabr.predict(X)
-
-
-    # Vorhersagen der Modelle in den DataFrame einfügen
-    df['randforest_pred'] = full_pred_rf
-    df['adaboost_pred'] = full_pred_adabr
-
-    # Berechne mean squared error für die Vorhersagen
-    mse_rf = mean_squared_error(y_test, predictions_rf)
-    r2_rf = r2_score(y_test, predictions_rf)
-
-    mse_adabr = mean_squared_error(y_test, predictions_adabr)
-    r2_adabr = r2_score(y_test, predictions_adabr)
-
-    # Dictionary mit den Ergebnissen
-    results = {'mse_rf':mse_rf, 'r2_rf':r2_rf, 'mse_adabr':mse_adabr, 'r2_adabr':r2_adabr}
-    results_df = pd.DataFrame(results, index=[0])
-
-    return df, feature_gini_importance, results_df, models
-
-# ALternative Klassenstruktur
-
-class NewCleanedData:
-
-    def __init__(self, df: pd.DataFrame, cleaning_notes: list[str]) -> None:
-        self.df = df
-        self.cleaning_notes = cleaning_notes
-    
-    @classmethod
-    def my_data_from_csv(cls, 
-                         raw_file_name: str, 
-                         column_names_types: dict[str, str]
-                         ) -> MyData:
-        
-        my_raw_file_path = _RawDataPath(raw_file_name).file_path
-        df = pd.read_csv(my_raw_file_path, index_col=0, parse_dates=['date'])
-        cleaning_notes = cls._quality_checks(df, column_names_types)
-        df = df.astype(column_names_types)
-        return cls(df, cleaning_notes)
-
-    @classmethod
-    def _quality_checks(cls, 
-                        df: pd.DataFrame, 
-                        column_names_types: dict[str, str]
-                        ) -> list[str]:
-        
-        note_missing = cls._missing(df)
-        note_is_whole_int = cls._is_whole_int(df, column_names_types)
-        note_missing_dates = cls._missing_dates(df, column_name='date')
-        note_n_sby_values = cls._check_n_sby_values(df)
-        note_n_duty_values = cls._check_n_duty_values(df)
-        
-        cleaning_notes = [note_missing, note_is_whole_int, 
-                          note_missing_dates, note_n_sby_values,
-                          note_n_duty_values]
-
-        return cleaning_notes
-
-    @staticmethod
-    def _missing(df) -> str:
-        """
-        Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
-        gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
-        Liste von fehlenden Daten aus.
-
-        Args:
-            df (pandas.DataFrame): Der DataFrame, der überprüft 
-            werden soll.
-
-        Raises:
-            ValueError: Wenn es fehlende Daten in der CSV-Datei gibt.
-
-        Returns:
-            None
-        """
-        # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
-        # pd.Series mit Spalten als Index und Wert True wenn es 
-        # fehlende Daten gibt, sonst False
-        df_missing = df.isnull().any()
-        if df_missing.any():
-            # for-Schleife um die fehlenden Daten in der jeweiligen 
-            # Spalte zu finden
-            for col in df_missing.index:
-                # enumerate() gibt den Index und Wert jedes Elements 
-                # in der Spalte aus
-                for index, value in enumerate(df[col]):
-                    if pd.isna(value):
-                        # Füge die Spalte, das Datum und den Index des 
-                        # fehlenden Wertes in die Liste ein
-                        note = (f"Nicht erfolgreich:\n"
-                                f"Es fehlen Daten in Spalte: "
-                                f"{col}, Index: {index}")
-                    else:
-                        continue
-            raise ValueError("Fehlende Daten in der CSV-Datei")
-        else:
-            note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
-        
-        return note
-
-    @staticmethod
-    def _is_whole_int(df, column_names_types) -> str:
-
-        # Leere Liste für nicht-ganzzahlige Werte
-        non_int_list = []
-
-        # Liste alle integar-Spalten
-        t = column_names_types.items()
-        int_cols = [c for c, v in t if v=='int16' or v=='int32' or v=='int64']
-
-        # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
-        # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
-        # Interger-Wert sind. Wenn nicht, raise error und gebe das Datum
-        #  aus der 'date'-Spalte und Index des fehlerhaften Wertes aus.
-        for col in int_cols:
-            for index, value in enumerate(df[col]):
-                # Drücke ganze Zeile von index aus
-                if value != int(value):
-                    # Füge die Spalte, das Datum und den Index des 
-                    # fehlenden Wertes in die Liste ein
-                    non_int_list.append([col, df.loc[index]])
-                else:
-                    continue
-        
-        # Wenn die Liste nicht leer ist, beschreibe die 
-        # fehlerhaften Daten und raise error
-        if len(non_int_list) != 0:
-            print(f"Es gibt {len(non_int_list)} nicht-ganzzahlige "
-                    f"Werte im Datensatz:")
-            for data in non_int_list:
-                print(f"Spalte: {data[0]}, Zeile: {data[1]}")
-
-            note = f"Nicht-ganzzahlige Werte in den Spalten {int_cols}"
-            raise ValueError(note)
-        else:
-            cols = ", ".join([str(col) for col in int_cols])
-            note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
-        
-        return note
-
-    @staticmethod
-    def _missing_dates(df, column_name: str='date') -> str:
-        """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
-        start_date = df[column_name].min()
-        end_date = df[column_name].max()
-        date_range = pd.date_range(start=start_date, end=end_date)
-        missing_dates = []
-        for date in date_range:
-            if date not in df[column_name].values:
-                missing_dates.append(date)
-        if len(missing_dates) == 0:
-            note = "Erfolgreich: Alle Daten zwischen Start- und Enddatum vorhanden"
-        else:
-            print(f"Es fehlen {len(missing_dates)} "
-                  f"Daten zwischen Start- und Enddatum")
-            print(f"Die fehlenden Daten sind: {missing_dates}")
-            raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
-        
-        return note
-
-    @staticmethod
-    def _check_n_sby_values(df) -> str:
-        n_sby = df['n_sby'].unique()
-        return f"Werte in der n_sby-Spalte:{n_sby}"
-
-    @staticmethod
-    def _check_n_duty_values(df) -> str:
-        n_duty = df['n_duty'].unique()
-        return f"Werte in der n_duty-Spalte:{n_duty}"
-
-class NewTransformedData:
-    startdate = np.datetime64('2016-04-01')
-
-    def __init__(self, df_cleaned: pd.DataFrame) -> None:
-        
-        self._df_cleaned = df_cleaned
-        self.df_transformed = self._transform_cleaned_df()
-
-    def _transform_cleaned_df(self) -> pd.DataFrame:
-        s_demand = self.create_demand()
-        s_n_sick_adj = self.n_sick_adjusted()
-        df_transformed = self._df_cleaned.assign(demand=s_demand, 
-                                                 n_sick_adj=s_n_sick_adj)
-        return df_transformed
-
-    def create_demand(self) -> pd.Series:
-        df = self._df_cleaned # Alias für _df_cleaned
-        s_demand = np.where(df['sby_need'] > 0,
-                            df['sby_need'] + df['n_duty'] -
-                            df['n_sick'], np.nan)
-        return s_demand
-        
-    def n_sick_adjusted(self) -> pd.Series:
-        df = self._df_cleaned # Alias für _df_cleaned
-        n_duty_1700 = np.where(df['n_duty']==1700, 
-                               df['n_sick']*(19/17),
-                               df['n_sick'])
-        n_duty_adj = np.where(df['n_duty']==1800,
-                              df['n_sick']*(19/18),
-                              n_duty_1700)
-        s_n_sick_adj = np.round(n_duty_adj).astype(int)
-        return s_n_sick_adj
-
-    # day = np.array((self.df['date']-self.startdate).dt.days + 1)
-    # self.arr_day = day.reshape(-1, 1)
-    # self.arr_calls = np.array(self.df['calls']).reshape(-1, 1)
-
-# archiv
-
-def adaboo_fut_predict(self):
-    """Vorhersage der Anzahl der Notrufe"""
-    df = future(self.df1)
-    miss_adaboost_pred = df['adaboost_pred'].isna() # Series mit True/False, ob Wert fehlt
-    features = df.loc[miss_adaboost_pred, ['month', 'year', 'dayofmonth', 'weekday', 'weekofyear', 'dayofyear', 'season']] # Dataframe mit Features, an de fehlt
-    adaboost_pred = self.adabr.predict(features) # Vorhersage der Anzahl der Notrufe
-    df.loc[miss_adaboost_pred, 'adaboost_pred'] = adaboost_pred # Füge Vorhersage in df ein wo Wert fehlt
-    return df
-
-def features(df):
-
-    # Entferne unwichtige Spalten
-    df_feat_2 = df.drop(['n_duty', 'n_sby', 'sby_need', 'dafted', 'predict_day',
-                        'month', 'demand', 'calls_pred', 'calls', 'n_sick'],
-                        axis=1)
-    
-    cutoff_df = df.drop(['n_duty', 'n_sby', 'sby_need', 'dafted', 'calls_diff', 'season', 'date',
-                     'month', 'demand', 'calls_pred', 'calls', 'n_sick'],
-                    axis=1)
-    
-    # rename cutoff_df['predict_day'] to cutoff_df['time']
-    cutoff_df = cutoff_df.rename(columns={'predict_day':'time'})
-    # cutoff_df['instance_id'] = cutoff_df.index
-    cutoff_df['instance_id'] = cutoff_df.index
-
-    def train_test_daten(df):
-        """
-        Teilt den Datensatz in Trainings- und Testdaten mithilfe von 
-        sklearn.model_selection.train_test_split auf	
-        """
-        df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
-
-        df_train['test_data'] = False # Spalte 'test_data' erstellen und mit False füllen
-        df_test['test_data'] = True # Spalte 'test_data' erstellen und mit True füllen
-
-        # Zusammenführen der beiden DataFrames.
-        # sort=True: Sortiert die Spalten alphabetisch nach Spaltennamen
-        data = pd.concat([df_train, df_test], sort=True)
-        data['index'] = data.index # Index als Spalte hinzufügen
-
-        return data
-
-    data = train_test_daten(df_feat_2) # Datensatz in Trainings- und Testdaten mit Spalte 'test_data' aufteilen
-
-    es = ft.EntitySet('einsatzfahrende') # Erstelle EntitySet mit Namen 'einsatzfahrende'
-
-    es.add_dataframe( # Füge Dataframe 'data' zum EntitySet hinzu
-        data,
-        dataframe_name='data',
-        index='index',
-        time_index='date'
+        appended.to_pickle(f'{cd}\\df_adaboo_gscv.pkl')
+
+        return cls(
+            tss=tss,
+            dict_param_grid=param_grid,
+            df_gscv_new_results=adaboo_gscv_df,
+            df_gscv_all_results=appended,
+            scoring=scoring
         )
-    
-    # Lücke zwischen Zielzeitpunkt und letztem Zeitpunkt im Datensatz für den Feature-Berechnungszeitpunkt
-    #gap = 45
-    # Zeitfenster für den Feature-Engineering
-    #window_length = 100
-
-    # Delaying-Primitives  
-    #delaying_primitives = [ft.primitives.Lag(periods=i + gap) for i in range(window_length)]
-
-    #rolling_mean_primitive = RollingMean(window_length=window_length, 
-    #                                     gap=gap, min_periods=window_length)
-
-    #rolling_min_primitive = RollingMin(window_length=window_length, 
-    #                                   gap=gap, min_periods=window_length)
-    
-    # Erstelle Features mit Deep Feature Synthesis
-    # 'day' ist Tag des Monats (1-31)
-    # 'week' ist Kalenderwoche (1-52)
-    datetime_primitives = ['month', 'weekday', 'is_weekend', 'week', 'day', 'year', 'day_of_year']
-
-    features, feature_names = ft.dfs(entityset=es, # EntitySet
-                                    target_dataframe_name='data', # Ziel-Dataframe	
-                                    trans_primitives=(
-                                        datetime_primitives),
-                                        #+ delaying_primitives
-                                        #+ [rolling_mean_primitive, rolling_min_primitive]),
-                                    cutoff_time=cutoff_df, # Startdatum für Feature-Berechnung
-                                    )
-
-    return features, feature_names
-
-def train_test_daten(df):
-    """
-    Teilt den Datensatz in Trainings- und Testdaten mithilfe von 
-    sklearn.model_selection.train_test_split auf	
-    """
-    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
-
-    df_train['test_data'] = False # Spalte 'test_data' erstellen und mit False füllen
-    df_test['test_data'] = True # Spalte 'test_data' erstellen und mit True füllen
-
-    # Zusammenführen der beiden DataFrames.
-    # sort=True: Sortiert die Spalten alphabetisch nach Spaltennamen
-    data = pd.concat([df_train, df_test], sort=True)
-    data['index'] = data.index
-
-    return data
-
-def get_train_test_fm(feature_matrix):
-
-    X_train = feature_matrix[feature_matrix['test_data'] == False]
-    X_train = X_train.drop(columns=['test_data']) # drop test_data Spalte
-    train_labels = X_train['calls']
-    X_train = X_train.drop(columns=['calls']) # drop calls Spalte
-    X_test = feature_matrix[feature_matrix['test_data'] == True]
-    test_labels = X_test['calls']
-    X_test = X_test.drop(columns=['test_data', 'calls']) # drop test_data und calls Spalte
-    
-    train_test = {'x_train':X_train, 'train_labels':train_labels, 'x_test':X_test, 'test_labels':test_labels}
-    
-    def df_to_csv(df, name):
-        """Verwendet absoluten Pfad des Skripts und relativen Pfad zur CSV-Datei um einen DataFrame zu erstellen"""
-        current_directory = os.path.dirname(__file__) # <-- absolute dir the script is in
-        # Namen des Dataframes
-        filepath = os.path.join(current_directory, f"../../Sample_Data/Processed/{name}.csv") # <-- absolute dir the script is in + path to csv file
-        df.to_csv(filepath, index=False)
-
-    for name, df in train_test.items():
-        df_to_csv(df, name)
-        
-    return train_test
-
-def seas_decomp(df):
-    calls_series = df['calls']
-    calls_series.index = df['date']
-    result = seasonal_decompose(calls_series, model='additive', period=60)
-    result.plot()
-    #plt.show()
-
-def is_whole_int(self) -> None:
-
-    # Leere Liste für nicht-ganzzahlige Werte
-    non_int_list = []
-
-    # Liste alle integar-Spalten
-    t = self.column_names_types.items()
-    int_cols = [c for c, v in t if v=='int16' or v=='int32' or v=='int64']
-
-    # Überprüft ob alle Werte in der Spalte 'calls', 'sby_need', 
-    # 'dafted', 'n_sick', 'n_duty', 'n_sby' gleich ihrem 
-    # Interger-Wert sind. Wenn nicht, raise error und gebe das Datum
-    #  aus der 'date'-Spalte und Index des fehlerhaften Wertes aus.
-    for col in int_cols:
-        for index, value in enumerate(self.df[col]):
-            # Drücke ganze Zeile von index aus
-            if value != int(value):
-                # Füge die Spalte, das Datum und den Index des 
-                # fehlenden Wertes in die Liste ein
-                non_int_list.append([col, self.df.loc[index]])
-            else:
-                continue
-    
-    # Wenn die Liste nicht leer ist, beschreibe die 
-    # fehlerhaften Daten und raise error
-    if len(non_int_list) != 0:
-        print(f"Es gibt {len(non_int_list)} nicht-ganzzahlige "
-                f"Werte im Datensatz:")
-        for data in non_int_list:
-            print(f"Spalte: {data[0]}, Zeile: {data[1]}")
-
-        note = f"Nicht-ganzzahlige Werte in den Spalten {int_cols}"
-        raise ValueError(note)
-    else:
-        cols = ", ".join([str(col) for col in int_cols])
-        note = f"Erfolgreich: Keine nicht-ganzzahligen Werte in den Spalten {cols}"
-        self.df_build_notes.append(note)
-
-def missing_dates(self, column_name: str='date') -> None:
-    """Überprüft, ob alle Daten zwischen Start- und Enddatum vorhanden sind"""
-    start_date = self.df[column_name].min()
-    end_date = self.df[column_name].max()
-    date_range = pd.date_range(start=start_date, end=end_date)
-    missing_dates = []
-    for date in date_range:
-        if date not in self.df[column_name].values:
-            missing_dates.append(date)
-    if len(missing_dates) == 0:
-        note = "Erfolgreich: Alle Daten zwischen Start- und Enddatum vorhanden"
-        self.df_build_notes.append(note)
-    else:
-        print(f"Es fehlen {len(missing_dates)} "
-                f"Daten zwischen Start- und Enddatum")
-        print(f"Die fehlenden Daten sind: {missing_dates}")
-        raise ValueError("Fehlende Daten zwischen Start- und Enddatum")
-
-def set_data_types(self) -> None:
-    # Alle Spalten außer 'date' in Integer umwandeln
-    int_cols = ['calls', 'sby_need', 'dafted', 'n_sick', 'n_duty', 'n_sby']
-    for col in int_cols:
-        self.df[col] = self.df[col].astype(int)
-
-    # Bestätigung, dass alle Spalten außer 'date' in Integer 
-    # umgewandelt wurden
-    note = "Erfolgreich: Alle Spalten ausser 'date' in Integer umgewandelt"
-    self.df_build_notes.append(note)
-
-    # 'date'-Spalte in Datetime umwandeln
-    self.df['date'] = pd.to_datetime(self.df['date'])
-
-    # Bestätigung, dass alle Daten in der 'date'-Spalte Datetime sind
-    note = "Erfolgreich: Alle Daten in der 'date'-Spalte sind Datetime-Datentyp"
-    self.df_build_notes.append(note)
-
-def missing(self) -> None:
-    """
-    Überprüft, ob es fehlende Daten in den Spalten des DataFrames 
-    gibt. Wenn ja, gibt es eine ValueError-Exception mit einer 
-    Liste von fehlenden Daten aus.
-
-    Args:
-        df (pandas.DataFrame): Der DataFrame, der überprüft 
-        werden soll.
-
-    Raises:
-        ValueError: Wenn es fehlende Daten in der CSV-Datei gibt.
-
-    Returns:
-        None
-    """
-    # Überprüft ob es fehlende Daten in den jeweiligen Spalten gibt.
-    # pd.Series mit Spalten als Index und Wert True wenn es 
-    # fehlende Daten gibt, sonst False
-    df_missing = self.df.isnull().any()
-    if df_missing.any():
-        # for-Schleife um die fehlenden Daten in der jeweiligen 
-        # Spalte zu finden
-        for col in df_missing.index:
-            # enumerate() gibt den Index und Wert jedes Elements 
-            # in der Spalte aus
-            for index, value in enumerate(self.df[col]):
-                if pd.isna(value):
-                    # Füge die Spalte, das Datum und den Index des 
-                    # fehlenden Wertes in die Liste ein
-                    note = (f"Nicht erfolgreich:\n"
-                            f"Es fehlen Daten in Spalte: "
-                            f"{col}, Index: {index}")
-                    self.df_build_notes.append(note)
-                else:
-                    continue
-        # Drücke die nicht vollständige Liste df_build_notes aus
-        [print(notes) for notes in self.df_build_notes]
-    
-        raise ValueError("Fehlende Daten in der CSV-Datei")
-    else:
-        note = "Erfolgreich: Keine fehlenden Daten in der CSV-Datei"
-        self.df_build_notes.append(note)
-
-def clean_data(self) -> None:
-    self.make_df()
-    self.missing()
-    self.is_whole_int()
-    self.missing_dates()
-    self.set_data_types()
-    self.check_sby_duty_values(self.dfb)
-
-def make_df(self) -> None:
-    self.df = pd.read_csv(self.file_path, 
-                            index_col=0, parse_dates=['date'])
-    
-    # ueberpruefe ob die Liste der Spaltennamen richtig ist
-    enote = "Spaltennamen sind nicht korrekt" 
-    assert list(self.df.columns).sort() == list(self.column_names).sort(), enote
-        
-    note = "Erfolgreich: Daten erfolgreich in einen DataFrame umgewandelt"
-    self.df_build_notes.append(note)
-
-def demand_pred_final(df2, trend_reg, calls_demand_reg):
-
-    startdate = np.datetime64('2016-04-01')
-    x2 = np.array((df2['date']-startdate).dt.days + 1).reshape(-1, 1)
-    trend_2 = trend_reg.predict(x2)
-    calls_pred_2 = (np.round(trend_2, 0)).astype(int)
-    df2['calls_reg_pred_2'] = calls_pred_2.reshape(-1)
-
-    df2['reg_adaboost_pred'] = df2['calls_reg_pred_2'] + df2['adaboost_pred']
-
-    # Nachfrage basierend auf reg_adaboost_pred
-    x_calls = np.array(df2['reg_adaboost_pred']).reshape(-1, 1)
-    nachfrage_pred = calls_demand_reg.predict(x_calls)
-    df2['nachfrage_pred'] = nachfrage_pred.reshape(-1)
-
-    return df2
