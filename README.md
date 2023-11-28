@@ -20,6 +20,8 @@ Speichere das Vorhersagemodell mit MLFlow:
 
 ## TODO
 - Erklärebarkeit (Explainability) muss gemacht werden.
+- Schreibe Unit-Tests
+- Vorhersagemodell sollte nicht zweimal geschrieben werden, einmal in MLFlow und einmal in dataPrep.
 - Vorhersagemodell sollte nicht mittels eines runs gelogged werden.
 - DataPrediction-Klasse und df_predict_sby_need-Methode muss aktualisiert werden, um es zu vereinfachen, das fertige Modell für Production zu verpacken.
 - dataPrep neu benennen. Vielleicht 'project_code'.
