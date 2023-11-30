@@ -12,7 +12,6 @@ from sklearn.model_selection import cross_validate
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.tree import DecisionTreeRegressor
-from statsmodels.tsa.seasonal import seasonal_decompose
 import warnings
 
 # ignore FutureWarnings
@@ -158,8 +157,7 @@ class RegressionCallsDemand:
         self.model_ftd_reg_calls_demand = model_ftd = self.fit(X, y)
         self.mode_scr_reg_calls_demand = self.score(model_ftd, X, y)
         self.arr_pred_demand = self.pred_calls_demand(model_ftd, calls)
-
-        
+  
     @staticmethod    
     def fit(X: np.ndarray,
             y: np.ndarray
@@ -212,11 +210,7 @@ class DataTrend:
         return calls_reg_act_diff
 
 class AdaBooReg:
-    def __init__(self, 
-                 X_train, 
-                 X_test, 
-                 y_train, 
-                 y_test) -> None:
+    def __init__(self, X_train, X_test, y_train, y_test) -> None:
         """Klasse für AdaBoost Vorhersagen"""
         self.X_test = X_test
         self.params_dict = params = {"adabooreg":
@@ -240,9 +234,7 @@ class AdaBooReg:
         self.gini_importance = pd.Series(model_ftd.feature_importances_,
                                          index=X_train.columns)
         
-    def adabooreg_model(self,
-                        params: dict[str, dict]
-                        ) -> AdaBoostRegressor:
+    def adabooreg_model(self, params: dict[str, dict]) -> AdaBoostRegressor:
         estimator = DecisionTreeRegressor(**params['dtreg'])
 
         adabr = AdaBoostRegressor(estimator=estimator,
@@ -251,9 +243,7 @@ class AdaBooReg:
                                   )
         return adabr
     
-    def metrics_calc(self,
-                     y_test: np.ndarray,
-                     adabooreg_pred: np.ndarray
+    def metrics_calc(self, y_test: np.ndarray, adabooreg_pred: np.ndarray
                      ) -> dict[str, np.float64]:
     
         mse = mean_squared_error(y_test, adabooreg_pred)
