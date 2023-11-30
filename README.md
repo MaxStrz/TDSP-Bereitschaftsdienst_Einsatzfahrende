@@ -16,6 +16,9 @@ Mache eine Vorhersage: [Vorhersagen.ipynb](https://github.com/MaxStrz/TDSP-Berei
 [Train und Test eines AdaBoost-Modell](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_ModellTrainTest.ipynb)  
 [Speichere das Vorhersagemodell mit MLFlow](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Vorhersagemodell_speichern.ipynb)  
 
+### Code  
+[dataPrep: alle verwendete Klassen ung Funktionen](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/dataPrep.py)  
+
 ## TODO
 - Erklärebarkeit (Explainability) muss gemacht werden.
 - Schreibe Unit-Tests
