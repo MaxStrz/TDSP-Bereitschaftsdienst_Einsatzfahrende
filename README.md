@@ -1,22 +1,22 @@
 "Vorhersage für den Bereitschaftsdienstplan" 
 
 ## How to use.
-Mache eine Vorhersage: [Vorhersagen.ipynb](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Vorhersagen.ipynb) - Das ist der wichtigste Notebook. Man kann Daten in Form "2016-01-29" eingeben und eine Vorhersage der Notwendigen Einsatzfahrende in Bereitschaftsdienst zurück kriegen.
+Mache eine Vorhersage: [Vorhersagen.ipynb](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Vorhersagen.ipynb) - Das ist der wichtigste Notebook. Man kann Daten in Form "2016-01-29" eingeben und eine Vorhersage der Notwendigen Einsatzfahrende in Bereitschaftsdienst zurück kriegen.  
 
 ### Analysis
 [Bereinige die Daten](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/Datenbereinigung.ipynb)  
-[Transformiere die Daten](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/Datentransformation.ipynb)
-[Füge Features hinzu](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/Features.ipynb)
-
-### Modeling
+[Transformiere die Daten](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/Datentransformation.ipynb)  
+[Füge Features hinzu](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Analysis/Features.ipynb)  
+  
+### Modeling  
 [Modell-Kreuzvalidierung](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Modelle_Kreuzvalidierung.ipynb)  
-[Grid-Search-Kreuzvalidierung](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_GridSearchKreuzvalidierung.ipynb)
-[Train und Test eines AdaBoost-Modell](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_ModellTrainTest.ipynb)
+[Grid-Search-Kreuzvalidierung](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_GridSearchKreuzvalidierung.ipynb)  
+[Train und Test eines AdaBoost-Modell](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_ModellTrainTest.ipynb)  
 [Speichere das Vorhersagemodell mit MLFlow](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Vorhersagemodell_speichern.ipynb)  
-
+  
 
 ## Weitere Dateien / Module
-
+  
 
 ## TODO
 - Erklärebarkeit (Explainability) muss gemacht werden.
