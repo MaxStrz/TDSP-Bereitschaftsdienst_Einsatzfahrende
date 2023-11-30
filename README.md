@@ -15,10 +15,6 @@ Mache eine Vorhersage: [Vorhersagen.ipynb](https://github.com/MaxStrz/TDSP-Berei
 [Grid-Search-Kreuzvalidierung](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_GridSearchKreuzvalidierung.ipynb)  
 [Train und Test eines AdaBoost-Modell](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/AdaBooReg_ModellTrainTest.ipynb)  
 [Speichere das Vorhersagemodell mit MLFlow](https://github.com/MaxStrz/TDSP-Bereitschaftsdienst_Einsatzfahrende/blob/master/Code/Modeling/Vorhersagemodell_speichern.ipynb)  
-  
-
-## Weitere Dateien / Module
-
 
 ## TODO
 - Erklärebarkeit (Explainability) muss gemacht werden.
